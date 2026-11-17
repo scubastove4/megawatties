@@ -20,17 +20,30 @@ Megawatties is a portfolio data-engineering project for New Zealand wholesale el
 ## Architecture
 
 ```
-EMI public CSVs  →  capture/  →  local staging  →  Unity Catalog volume  →  databricks/  →  Delta
+EMI public CSVs  →  capture  →  local staging  →  Unity Catalog volume  →  ingestion  →  Delta
                          ↑                              ↑
-                    orchestration/ (Prefect) ────────────┘
+                    orchestration (Prefect) ────────────┘
                          ↑
-                      shared/   pure rules imported by capture and databricks
+                      shared   pure rules imported by capture and ingestion
 ```
 
-- **`orchestration/`** — Prefect flows only. Poll, call capture, upload to the volume, trigger the Databricks job, then delete local files once that trading date is closed. No HTTP parsing of EMI and no Spark.
-- **`capture/`** — Download EMI files (and, later, Open-Meteo). Manifest, checksums, and the local staging files. No Spark and no Databricks SDK.
-- **`databricks/`** — Asset bundle, job, bronze, silver, gold, and quality checks. Reads the volume. Does not call EMI. Free Edition serverless cannot be relied on to reach the public blob.
-- **`shared/`** — Pure domain rules: expected filenames, interim/final/incomplete rank, NZ business days, trading-period UTC intervals, checksums. No Prefect, Spark, HTTP, or `datetime.now()` inside the pure functions. Capture and Databricks both import this package.
+Python packages live under `src/` and are installed with `pip install -e .`. Imports are `shared`, `capture`, `ingestion`, and `orchestration`. `src` is not a package and does not appear in an import. Do not add the repo root to `PYTHONPATH`. Paths that touch the disk go through `pathlib`.
+
+```text
+pyproject.toml
+databricks.yml          # bundle root; the CLI looks for it here
+src/
+  shared/
+  capture/
+  ingestion/
+  orchestration/
+data/landing/           # gitignored local CSVs
+```
+
+- **`orchestration`** — Prefect flows only. Poll, call capture, upload to the volume, trigger the Databricks job, then delete local files once that trading date is closed. No HTTP parsing of EMI and no Spark.
+- **`capture`** — Download EMI files (and, later, Open-Meteo). Manifest, checksums, and the local staging files. No Spark and no Databricks SDK.
+- **`ingestion`** — Job code, bronze, silver, gold, and quality checks. Reads the volume. Does not call EMI. The folder is named for the step, not the vendor, so it does not clash with the Databricks SDK and a later tool can sit beside it. Free Edition serverless cannot be relied on to reach the public blob.
+- **`shared`** — Pure domain rules: expected filenames, interim/final/incomplete rank, NZ business days, trading-period UTC intervals, checksums. No Prefect, Spark, HTTP, or `datetime.now()` inside the pure functions. `capture` and `ingestion` both import this package.
 
 The volume and the Delta tables are the durable copy. The laptop is staging. Local CSVs are deleted only after the job has succeeded and that trading date is closed. The manifest keeps `path`, `bytes`, and `sha256`, so a replaced remote file is downloaded again.
 
@@ -127,25 +140,26 @@ The repo is `~/Desktop/Projects/megawatties`. Phase 1 has not started. The seed 
 
 Planned layout, empty until that work starts:
 
-- `orchestration/` — Prefect flow and the three daily polls
-- `capture/` — EMI download and the manifest
-- `databricks/` — `databricks.yml`, the job definition, bronze, silver, quality, gold
-- `shared/` — pure filename, rank, calendar, and interval rules
+- `src/orchestration/` — Prefect flow and the three daily polls
+- `src/capture/` — EMI download and the manifest
+- `src/ingestion/` — bronze, silver, quality, gold
+- `src/shared/` — pure filename, rank, calendar, and interval rules
+- `databricks.yml` — bundle root at the repo root
 - `data/landing/` — gitignored local CSVs
 
 ## Testing
 
 - Tests are required for domain rules and transforms, written with the code. A feature is not done until its tests pass. Fix the code, not the test, unless the user approves a requirement change.
-- Keep filename selection, rank, business-day deadlines, UTC intervals, checksum decisions, the current-price winner, change-tracking pair selection, and the time-weighted average in `shared/` as pure functions.
+- Keep filename selection, rank, business-day deadlines, UTC intervals, checksum decisions, the current-price winner, change-tracking pair selection, and the time-weighted average in `src/shared/` as pure functions.
 - Runner: pytest from the repo root.
 - Co-locate tests inside the package they cover. Use checked-in fixtures and fixed timestamps. No live EMI calls, no Databricks workspace, and no real clock in unit tests.
 
 ## Dev environment
 
-- Python 3.11+.
+- Local Python is 3.14. Prefect 3.4.25 and later supports it. Pin the laptop environment to 3.14.
+- Databricks serverless runs Python 3.12.3 (environment versions 4 through 6). `shared` and `ingestion` execute there, so those packages stay compatible with 3.12: no 3.13-only or 3.14-only syntax. Ship them as a pure-Python wheel. `capture` and `orchestration` run only on the laptop.
 - Prefect 3, local UI, timezone `Pacific/Auckland`.
 - Databricks CLI authenticated to the Free Edition workspace. `databricks bundle deploy` and a Jobs API trigger are the deploy path.
-- Databricks transformations are also exercised with a local Spark session so iteration does not spend Free Edition quota.
 - Do not commit `.env`, CLI profiles, or tokens.
 
 ## Branching
