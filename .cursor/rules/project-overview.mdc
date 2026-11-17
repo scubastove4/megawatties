@@ -156,10 +156,10 @@ Planned layout, empty until that work starts:
 
 ## Dev environment
 
-- Python 3.11+.
+- Local Python is 3.14. Prefect 3.4.25 and later supports it. Pin the laptop environment to 3.14.
+- Databricks serverless runs Python 3.12.3 (environment versions 4 through 6). `shared` and `ingestion` execute there, so those packages stay compatible with 3.12: no 3.13-only or 3.14-only syntax. Ship them as a pure-Python wheel. `capture` and `orchestration` run only on the laptop.
 - Prefect 3, local UI, timezone `Pacific/Auckland`.
 - Databricks CLI authenticated to the Free Edition workspace. `databricks bundle deploy` and a Jobs API trigger are the deploy path.
-- Databricks transformations are also exercised with a local Spark session so iteration does not spend Free Edition quota.
 - Do not commit `.env`, CLI profiles, or tokens.
 
 ## Branching
