@@ -1,0 +1,153 @@
+---
+description: Megawatties product vision, architecture, roadmap, and dev environment — the standard guide for this project
+alwaysApply: true
+---
+
+# Megawatties — Project Overview
+
+## Product vision
+
+Megawatties is a portfolio data-engineering project for New Zealand wholesale electricity prices from the Electricity Authority's EMI site. It runs on Databricks Free Edition. The laptop stages public CSVs, Prefect runs the schedule, and Databricks holds the durable Delta tables.
+
+- Capture interim and final trading-period prices, then the more detailed dispatch prices inside each period.
+- Keep every published version. The price a reader would see still lets the final win.
+- Show how often the final differed from the interim, and how prices move over time.
+- Leave the tables shaped so a screen could list a trading period and open it onto the dispatch prices. This project does not build that screen.
+- Generation, offers, and weather come later. The price files contain `$/MWh` and status only.
+
+**Platform:** Databricks Free Edition, one workspace, serverless only. A paid workspace is a documented difference, not a second build. Do not provision cloud resources or a second SQL warehouse.
+
+## Architecture
+
+```
+EMI public CSVs  →  capture/  →  local staging  →  Unity Catalog volume  →  databricks/  →  Delta
+                         ↑                              ↑
+                    orchestration/ (Prefect) ────────────┘
+                         ↑
+                      shared/   pure rules imported by capture and databricks
+```
+
+- **`orchestration/`** — Prefect flows only. Poll, call capture, upload to the volume, trigger the Databricks job, then delete local files once that trading date is closed. No HTTP parsing of EMI and no Spark.
+- **`capture/`** — Download EMI files (and, later, Open-Meteo). Manifest, checksums, and the local staging files. No Spark and no Databricks SDK.
+- **`databricks/`** — Asset bundle, job, bronze, silver, gold, and quality checks. Reads the volume. Does not call EMI. Free Edition serverless cannot be relied on to reach the public blob.
+- **`shared/`** — Pure domain rules: expected filenames, interim/final/incomplete rank, NZ business days, trading-period UTC intervals, checksums. No Prefect, Spark, HTTP, or `datetime.now()` inside the pure functions. Capture and Databricks both import this package.
+
+The volume and the Delta tables are the durable copy. The laptop is staging. Local CSVs are deleted only after the job has succeeded and that trading date is closed. The manifest keeps `path`, `bytes`, and `sha256`, so a replaced remote file is downloaded again.
+
+Unity Catalog schema: `emi`. Volume: `emi.landing`. The catalog name comes from the Free Edition workspace and is set in `databricks.yml` on first setup. The bundle name is `megawatties`. One target, `dev`, `mode: development`. No service principal.
+
+## Data design
+
+**Trading-period prices** (`FinalEnergyPrices`), one bronze table for interim, final, and incomplete files. Append-only. Raw columns plus source filename, file status, file modified time when known, ingest timestamp, and checksum. Skip a file whose checksum is unchanged.
+
+**Silver prices** keep every version, including an interim that arrives after a final. Grain: `(point_of_connection, trading_date, trading_period, source_file, checksum)`. Each row has `status_rank`, `ingested_at`, and the UTC interval start and end.
+
+Status rank, from the filename: final 3, incomplete 2, interim 1. Confirmed bulk columns are expected to be `TradingDate`, `TradingPeriod`, `PointOfConnection`, `DollarsPerMegawattHour`. Confirm the header on the first real file. Parse `yyyy-mm-dd` and `dd/mm/yyyy`. Prices may be negative.
+
+**Current price** is the view `gold.current_price`. One row per node, trading date, and trading period. Final wins. Within the same status, the latest ingest wins.
+
+```sql
+SELECT *
+FROM silver_energy_prices
+QUALIFY ROW_NUMBER() OVER (
+  PARTITION BY point_of_connection, trading_date, trading_period
+  ORDER BY status_rank DESC, ingested_at DESC
+) = 1
+```
+
+**Change tracking** (`gold.price_change`) compares a final with the latest interim whose `ingested_at` is before that final. Interims that arrive after the final stay in silver and are excluded here. Store final minus interim, the percentage change, and the share of intervals that changed per node. Label the metrics with the capture start date. Interim history cannot be backfilled from `ByMonth`.
+
+**Rolling statistics** (`gold.price_stats`) are taken from `gold.current_price` on the trading-period UTC time, not the ingest time. Mean, min, max, standard deviation, and a high percentile. Short windows stay at trading-period grain. Longer windows are daily. Views are enough at this size.
+
+**Dispatch prices** are a separate bronze and silver, partitioned by `trading_date`. Grain: `(trading_date, trading_period, point_of_connection, publish_datetime)`. A changed checksum uses Delta `replaceWhere` on that trading date. Load every node. A node filter is a development switch only.
+
+**Validation** (`gold.price_validation`) is one row per node, trading date, and trading period: time-weighted dispatch average, interim price, final price, both differences, seconds covered out of 1800, and flags. Duration comes from consecutive timestamps. The last price runs to the period boundary. Proxy prices and a large residual are flags, not failed rows.
+
+**Drill-down, no UI.** `gold.current_price` is the list. `silver.dispatch_energy_price` is the click-through, ordered by `publish_datetime`.
+
+Reference nodes for published statistics: `BEN2201` (Benmore), `HAY2201` (Haywards), `OTA2201` (Otahuhu).
+
+## Roadmap
+
+| Phase | Scope | Status |
+|---|---|---|
+| 1 | Capture. Prefect polls. Download interim and final files. Checksum manifest. Local files stay on disk. One smoke upload to the volume. No bronze tables yet. | Planned |
+| 2 | Price bronze, versioned silver, `gold.current_price`, change tracking, rolling statistics. Wire the job trigger and local deletion. | Planned |
+| 3 | Dispatch for every node, time-weighted validation, trading-period drill-down. | Planned |
+| 4 | Generation (`Generation_MD`) and one rolling month of offers. Price times estimated injection, not market settlement. | Planned |
+| 5 | Open-Meteo weather beside hydro and wind generation and the island reference prices. | Planned |
+
+Branch names for these phases live in `git-branching.mdc`. Do not redefine the phase numbers there.
+
+## Design principles
+
+1. **Capture interim files early.** Each day of delay is an interim file that cannot be recovered. Finals can be backfilled. Interims cannot.
+2. **Keep every version.** A late interim is stored and never becomes the current price.
+3. **The laptop is staging.** The volume and Delta are the system of record.
+4. **Checksums make a repeated download harmless.** Reload only when the hash changes.
+5. **Weight dispatch prices by time.** A plain mean of the prices in a period is the wrong comparison.
+6. **Windows use UTC interval times.** `trading_period` stays the business key.
+
+## Concrete tuning values
+
+- **Polls:** 9:30, 15:30, and 18:30 in `Pacific/Auckland`. The 15:30 run is the one after the 2pm final-price deadline. The first runs record whether the morning file is already present at 9:30, and whether the interim checksum changes across the three runs.
+- **Lookback:** seven calendar days for trading-period files, five for dispatch files.
+- **Final-price deadline:** 2pm NZ on the next business day. Weekends and NZ public holidays are skipped. A Friday trading date is due Monday at 15:30. A pricing-error claim can push it later.
+- **Dispatch settlement:** treat the file as open until the morning after trading-date + 3 calendar days. Delete the local CSV only when the final trading-period file is in `emi.ingested_files`, the dispatch file is ingested, today is at least trading-date + 3 calendar days, and a later poll saw the same checksum.
+- **Ranks:** final 3, incomplete 2, interim 1.
+- **Change and rolling windows:** 7, 14, 30, 90, 180, 270, and 365 days. Rolling statistics also include 12 hours and 24 hours.
+- **Trading periods:** normally 48. The spring-forward day has 46 and the fall-back day has 50. Derive civil time in `Pacific/Auckland`, then convert to UTC. Quality accepts period counts of 46, 48, or 50 for the reference nodes.
+- **Files:** daily finals `YYYYMMDD_FinalEnergyPrices.csv`, interim suffix `_I`, about 320 KB. Completed years live in `ByMonth/`. An `_incomplete` monthly file does not suppress that month's dailies. Dispatch path `DispatchEnergyPrices/YYYY/YYYYMMDD_DispatchEnergyPrices.csv`, about 4 MB, no `_I` suffix.
+- **Backfill:** finals may extend to 1 November 2022 after the header check. Real-time pricing starts that day. Dispatch backfill is January 2025 through the current month, in month-sized batches.
+- **Validation example:** `$1` for minutes 0–5, `$2` for 5–7, `$3` for 7–21, `$1` for 21–30. Time-weighted average `(1×14 + 2×2 + 3×14) / 30 = 2.00`. The plain mean of the four prices is `1.75`.
+- **Weight direction** waits on whether `PublishDateTime` is the start or the end of the interval. Confirm that on the first dispatch file before trusting durations.
+- **Hard quality failures:** null business keys, `trading_period` outside 1–50, a duplicate `(point_of_connection, trading_date, trading_period, checksum)` in silver, or a current-price row that is still interim when a final version exists. Stale interims and odd reference-node period counts are warnings.
+
+Out of scope: SPD case files, GDX files, bids, reserve prices, forecast prices, constrained on/off costs, and any UI.
+
+## Later-phase data
+
+- **Generation.** Monthly `Generation_MD`, usually in the second week of the next month. Wide `TP1`–`TP50` in kWh. Unpivot, drop null periods, convert kWh to MWh. Several plants can share one point of connection. `Gen_Code` identifies the plant. `gold.poc_period` uses `notional_nzd = price * mwh`. `gold.reconciliation_break` is generation at a POC and period with no current price, only for POCs that appear in generation.
+- **Offers.** Latest submission per unit, product, band, trading date, and trading period. Pin the header from the first file. Rolling one-month window.
+- **Weather.** Open-Meteo hourly wind and rain for Benmore, Clyde, Manapouri, and two wind areas. No API key. Map hours onto trading periods in `Pacific/Auckland`. `gold.weather_price` is daily hydro MWh, wind MWh, catchment rain, wind speed, and the Benmore and Otahuhu prices.
+
+## Open questions
+
+Ask before inventing an answer.
+
+- Bulk final-price CSV header, date format, and any headerless files.
+- Whether `PublishDateTime` marks the start or the end of a dispatch interval.
+- Whether the current day's interim checksum changes across the three daily polls.
+- What `ByMonth/` contains before relying on it for a final-price backfill.
+- Node-to-region labels beyond the three reference nodes.
+
+## Current codebase
+
+The repo is `~/Desktop/Projects/megawatties`. Phase 1 has not started. The seed commit on `main` contains these rules only. Pipeline code belongs on a feature branch cut from `release/phase-1-capture`.
+
+Planned layout, empty until that work starts:
+
+- `orchestration/` — Prefect flow and the three daily polls
+- `capture/` — EMI download and the manifest
+- `databricks/` — `databricks.yml`, the job definition, bronze, silver, quality, gold
+- `shared/` — pure filename, rank, calendar, and interval rules
+- `data/landing/` — gitignored local CSVs
+
+## Testing
+
+- Tests are required for domain rules and transforms, written with the code. A feature is not done until its tests pass. Fix the code, not the test, unless the user approves a requirement change.
+- Keep filename selection, rank, business-day deadlines, UTC intervals, checksum decisions, the current-price winner, change-tracking pair selection, and the time-weighted average in `shared/` as pure functions.
+- Runner: pytest from the repo root.
+- Co-locate tests inside the package they cover. Use checked-in fixtures and fixed timestamps. No live EMI calls, no Databricks workspace, and no real clock in unit tests.
+
+## Dev environment
+
+- Python 3.11+.
+- Prefect 3, local UI, timezone `Pacific/Auckland`.
+- Databricks CLI authenticated to the Free Edition workspace. `databricks bundle deploy` and a Jobs API trigger are the deploy path.
+- Databricks transformations are also exercised with a local Spark session so iteration does not spend Free Edition quota.
+- Do not commit `.env`, CLI profiles, or tokens.
+
+## Branching
+
+- See `git-branching.mdc`.

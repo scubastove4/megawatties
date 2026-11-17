@@ -1,0 +1,44 @@
+---
+description: Git branching strategy for Megawatties. One release branch per phase, feature branches off each release branch.
+alwaysApply: true
+---
+
+# Branching strategy
+
+Phases and their order are defined in `project-overview.mdc`. Don't redefine them here. Refer to them by the names and numbers used there.
+
+## Structure
+
+- `main` holds completed phases only, plus the seed commit that added these rules.
+- Each phase has one **release branch**: `release/phase-<n>-<short-name>`, using the phase number and a short name from `project-overview.mdc`.
+  - `release/phase-1-capture`
+  - `release/phase-2-prices`
+  - `release/phase-3-dispatch`
+  - `release/phase-4-generation`
+  - `release/phase-5-weather`
+- Cut the release branch from `main` when the phase starts.
+- All pipeline work happens on **feature branches** cut from the current phase's release branch: `feature/<short-description>`.
+- Keep each feature branch to one focused change.
+- No hotfix branches. Ship only through the phase release flow.
+
+## Flow
+
+1. Cut `release/phase-<n>-<short-name>` from `main` at the start of a phase. `release/phase-1-capture` is cut as part of seeding the repo.
+2. Cut `feature/<short-description>` from that release branch.
+3. When the feature is done, the agent may ask to open a pull request into the release branch. The user merges. Tests must pass first (`pytest`).
+4. Merge the feature into the release branch with a **squash merge** (one squash commit per feature on the release branch). Delete the feature branch afterward and don't reuse it. Start a new branch for follow-up work.
+5. When the phase is complete, merge the release branch into `main` with a **merge commit** (no squash), so each feature's squash commit stays visible in `main`'s history and remains individually revertable.
+6. Cut the next phase's release branch from `main` only after the previous phase has been merged.
+
+## Merge style
+
+- Feature into release: squash merge, one clean commit per feature.
+- Release into main: merge commit, no squash, so features remain traceable and revertable individually.
+- The user performs merges. The agent may ask to open PRs when appropriate. Do not merge unless asked.
+
+## Agent rules
+
+- Never commit directly to `main` or any `release/*` branch. The rules seed on `main` is the one exception, and it has already been made.
+- Never force-push, rewrite history on shared branches, or delete branches without asking.
+- Don't create, merge, or delete branches unless asked. When asked to start work, confirm which phase and release branch to base it on.
+- If the current branch isn't a `feature/*` branch, say so before making changes and ask which branch to use.
