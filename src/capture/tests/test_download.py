@@ -55,7 +55,7 @@ def test_download_skips_a_file_whose_checksum_is_unchanged(tmp_path: Path, caplo
     assert f"unchanged relative_path={final_path}" in caplog.text
     assert "download finished downloaded=0 replaced=0 unchanged=2 restored=0 missing=0" in caplog.text
     record = Manifest.load(landing / "daily/2026-11-11/manifest.json").files[final_path]
-    assert len(record.observations) == 2
+    assert [item["outcome"] for item in record.observations] == ["downloaded", "unchanged"]
     assert record.sha256 == sha256_hex(body)
 
 
@@ -85,6 +85,7 @@ def test_changed_checksum_replaces_the_local_file(tmp_path: Path) -> None:
     )
     record = Manifest.load(manifest_path).files[relative]
     assert replaced.replaced == [relative]
+    assert [item["outcome"] for item in record.observations] == ["downloaded", "replaced"]
     assert record.uploaded is False
     assert (landing / relative).read_bytes() == b"second\n"
 
@@ -138,6 +139,7 @@ def test_a_short_local_file_is_rewritten_when_the_checksum_matches(tmp_path: Pat
     )
     saved = Manifest.load(manifest_path).files[relative]
     assert restored.restored == [relative]
+    assert [item["outcome"] for item in saved.observations] == ["downloaded", "restored"]
     assert (landing / relative).read_bytes() == body
     assert saved.uploaded is True
     assert saved.sha256 == sha256_hex(body)

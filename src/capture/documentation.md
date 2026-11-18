@@ -24,7 +24,7 @@ Fetches the files `shared` asked for and hands the bytes to `store_bytes`.
 
 The checksum gate. One JSON file per trading-date folder or month folder, not one file for all of `data/landing`.
 
-`FileRecord` is one captured file: relative path, sha256, byte size, source URL, status, trading date, whether it has been uploaded, whether the local CSV is still on disk, and the list of times that hash was seen.
+`FileRecord` is one captured file: relative path, sha256, byte size, source URL, status, trading date, whether it has been uploaded, whether the local CSV is still on disk, and one observation per poll. Each observation stores the time, the sha256, and the outcome (`downloaded`, `unchanged`, `replaced`, or `restored`).
 
 `Manifest.load` returns an empty manifest when that folder's file is not there yet. `Manifest.save` writes to a temporary file and then replaces the real one, so a failed write does not leave a half-written manifest. A run that stops midway leaves the dates it already saved, and the next run finishes the rest.
 

@@ -81,8 +81,8 @@ class Manifest:
         temporary.replace(path)
 
 
-def observe(record: FileRecord, now: datetime, digest: str) -> None:
-    record.observations.append({"at": now.isoformat(), "sha256": digest})
+def observe(record: FileRecord, now: datetime, digest: str, outcome: str) -> None:
+    record.observations.append({"at": now.isoformat(), "sha256": digest, "outcome": outcome})
 
 
 def _disk_matches(destination: Path, digest: str) -> bool:
@@ -132,7 +132,7 @@ def store_bytes(
     current = manifest.files.get(relative_path)
     if current is not None and current.sha256 == digest:
         if _disk_matches(destination, digest):
-            observe(current, now, digest)
+            observe(current, now, digest, "unchanged")
             current.local_exists = True
             logger.info(
                 "unchanged relative_path=%s bytes=%s sha256=%s",
@@ -142,7 +142,7 @@ def store_bytes(
             )
             return "unchanged"
         _write_verified(destination, content, digest)
-        observe(current, now, digest)
+        observe(current, now, digest, "restored")
         current.local_exists = True
         logger.info(
             "restored relative_path=%s bytes=%s sha256=%s",
@@ -167,9 +167,9 @@ def store_bytes(
     record.trading_date = trading_date
     record.uploaded = False
     record.local_exists = True
-    observe(record, now, digest)
-    manifest.files[relative_path] = record
     outcome = "replaced" if current is not None else "downloaded"
+    observe(record, now, digest, outcome)
+    manifest.files[relative_path] = record
     logger.info(
         "%s relative_path=%s bytes=%s sha256=%s",
         outcome,
