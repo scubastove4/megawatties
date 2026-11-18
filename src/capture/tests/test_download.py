@@ -1,8 +1,10 @@
 from datetime import date, datetime
 from pathlib import Path
 
-from capture.download import download_prices
-from capture.manifest import Manifest
+import pytest
+
+from capture.download import IncompleteDownload, download_prices, require_content_length, urllib_fetcher
+from capture.manifest import IncompleteFile, Manifest, store_bytes
 from shared.calendar import AUCKLAND
 from shared.checksums import sha256_hex
 
@@ -51,7 +53,7 @@ def test_download_skips_a_file_whose_checksum_is_unchanged(tmp_path: Path, caplo
     assert final_path in second.unchanged
     assert f"downloaded relative_path={final_path}" in caplog.text
     assert f"unchanged relative_path={final_path}" in caplog.text
-    assert "download finished downloaded=0 replaced=0 unchanged=2 missing=0" in caplog.text
+    assert "download finished downloaded=0 replaced=0 unchanged=2 restored=0 missing=0" in caplog.text
     record = Manifest.load(landing / "daily/2026-11-11/manifest.json").files[final_path]
     assert len(record.observations) == 2
     assert record.sha256 == sha256_hex(body)
@@ -106,3 +108,97 @@ def test_each_trading_date_has_its_own_manifest(tmp_path: Path) -> None:
     second = Manifest.load(landing / "daily/2026-11-12/manifest.json")
     assert set(first.files) == {"daily/2026-11-11/20261111_FinalEnergyPrices.csv"}
     assert set(second.files) == {"daily/2026-11-12/20261112_FinalEnergyPrices.csv"}
+
+
+def test_a_short_local_file_is_rewritten_when_the_checksum_matches(tmp_path: Path) -> None:
+    landing = tmp_path / "landing"
+    body = b"TradingDate,TradingPeriod\n2026-11-11,1\n"
+    relative = "daily/2026-11-11/20261111_FinalEnergyPrices.csv"
+    files = {"20261111_FinalEnergyPrices.csv": body}
+    download_prices(
+        start=date(2026, 11, 11),
+        end=date(2026, 11, 11),
+        today=date(2026, 11, 18),
+        now=datetime(2026, 11, 12, 9, 30, tzinfo=AUCKLAND),
+        landing=landing,
+        fetcher=_fetcher(files),
+    )
+    manifest_path = landing / "daily/2026-11-11/manifest.json"
+    manifest = Manifest.load(manifest_path)
+    manifest.files[relative].uploaded = True
+    manifest.save(manifest_path)
+    (landing / relative).write_bytes(b"short")
+    restored = download_prices(
+        start=date(2026, 11, 11),
+        end=date(2026, 11, 11),
+        today=date(2026, 11, 18),
+        now=datetime(2026, 11, 12, 15, 30, tzinfo=AUCKLAND),
+        landing=landing,
+        fetcher=_fetcher(files),
+    )
+    saved = Manifest.load(manifest_path).files[relative]
+    assert restored.restored == [relative]
+    assert (landing / relative).read_bytes() == body
+    assert saved.uploaded is True
+    assert saved.sha256 == sha256_hex(body)
+    assert list((landing / "daily/2026-11-11").glob("*.partial")) == []
+
+
+def test_a_partial_write_is_not_recorded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    destination = tmp_path / "20261111_FinalEnergyPrices.csv"
+    content = b"full-file\n"
+    real_read = Path.read_bytes
+
+    def short_read(self: Path) -> bytes:
+        if self.name.endswith(".partial"):
+            return b"x"
+        return real_read(self)
+
+    monkeypatch.setattr(Path, "read_bytes", short_read)
+    manifest = Manifest()
+    with pytest.raises(IncompleteFile):
+        store_bytes(
+            manifest,
+            relative_path="daily/2026-11-11/20261111_FinalEnergyPrices.csv",
+            content=content,
+            url="https://example.test/20261111_FinalEnergyPrices.csv",
+            status="final",
+            trading_date="2026-11-11",
+            now=datetime(2026, 11, 12, 9, 30, tzinfo=AUCKLAND),
+            destination=destination,
+        )
+    assert manifest.files == {}
+    assert not destination.exists()
+    assert not destination.with_name(destination.name + ".partial").exists()
+
+
+def test_content_length_must_match_the_body() -> None:
+    url = "https://example.test/20261113_FinalEnergyPrices.csv"
+    body = b"price,row\n"
+    require_content_length(str(len(body)), len(body), url)
+    with pytest.raises(IncompleteDownload, match="does not match"):
+        require_content_length(str(len(body)), len(b"short"), url)
+    with pytest.raises(IncompleteDownload, match="missing Content-Length"):
+        require_content_length(None, 11, url)
+    with pytest.raises(IncompleteDownload, match="empty file"):
+        require_content_length("0", 0, url)
+
+
+def test_urllib_fetcher_rejects_a_short_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    url = "https://example.test/20261113_FinalEnergyPrices.csv"
+
+    class _Response:
+        headers = {"Content-Length": "4"}
+
+        def read(self) -> bytes:
+            return b"ab"
+
+        def __enter__(self) -> "_Response":
+            return self
+
+        def __exit__(self, *args: object) -> bool:
+            return False
+
+    monkeypatch.setattr("capture.download.urllib.request.urlopen", lambda *args, **kwargs: _Response())
+    with pytest.raises(IncompleteDownload):
+        urllib_fetcher(url)

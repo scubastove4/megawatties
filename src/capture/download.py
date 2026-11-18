@@ -16,11 +16,29 @@ logger = get_logger(__name__)
 Fetcher = Callable[[str], bytes | None]
 
 
+class IncompleteDownload(Exception):
+    """The response body does not match the Content-Length from upstream."""
+
+
+def require_content_length(header: str | None, size: int, url: str) -> None:
+    if header is None:
+        raise IncompleteDownload(f"missing Content-Length for {url}")
+    try:
+        expected = int(header)
+    except ValueError as exc:
+        raise IncompleteDownload(f"invalid Content-Length for {url}: {header}") from exc
+    if expected == 0 or size == 0:
+        raise IncompleteDownload(f"empty file for {url}")
+    if expected != size:
+        raise IncompleteDownload(f"Content-Length {expected} does not match {size} bytes for {url}")
+
+
 @dataclass
 class DownloadReport:
     downloaded: list[str] = field(default_factory=list)
     replaced: list[str] = field(default_factory=list)
     unchanged: list[str] = field(default_factory=list)
+    restored: list[str] = field(default_factory=list)
     missing: list[str] = field(default_factory=list)
 
 
@@ -28,7 +46,9 @@ def urllib_fetcher(url: str) -> bytes | None:
     request = urllib.request.Request(url)
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
-            return response.read()
+            body = response.read()
+            require_content_length(response.headers.get("Content-Length"), len(body), url)
+            return body
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
             return None
@@ -80,13 +100,14 @@ def download_prices(
                 destination=landing / price_file.relative_path,
             )
             getattr(report, outcome).append(price_file.relative_path)
-        manifest.save(manifest_path)
+            manifest.save(manifest_path)
         logger.info("wrote manifest path=%s files=%s", manifest_path, len(manifest.files))
     logger.info(
-        "download finished downloaded=%s replaced=%s unchanged=%s missing=%s",
+        "download finished downloaded=%s replaced=%s unchanged=%s restored=%s missing=%s",
         len(report.downloaded),
         len(report.replaced),
         len(report.unchanged),
+        len(report.restored),
         len(report.missing),
     )
     return report

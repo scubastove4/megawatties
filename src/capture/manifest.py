@@ -11,6 +11,16 @@ from shared.checksums import sha256_hex
 logger = get_logger(__name__)
 
 
+class IncompleteFile(Exception):
+    """The bytes on disk do not match the bytes just downloaded."""
+
+    def __init__(self, path: Path, expected: str, actual: str) -> None:
+        self.path = path
+        self.expected = expected
+        self.actual = actual
+        super().__init__(f"partial file at {path}: expected {expected}, got {actual}")
+
+
 @dataclass
 class FileRecord:
     relative_path: str
@@ -75,6 +85,34 @@ def observe(record: FileRecord, now: datetime, digest: str) -> None:
     record.observations.append({"at": now.isoformat(), "sha256": digest})
 
 
+def _disk_matches(destination: Path, digest: str) -> bool:
+    if not destination.is_file():
+        return False
+    return sha256_hex(destination.read_bytes()) == digest
+
+
+def _write_verified(destination: Path, content: bytes, digest: str) -> None:
+    """Write `content` beside `destination` and rename it only when the hash matches."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(destination.name + ".partial")
+    try:
+        temporary.write_bytes(content)
+        written = temporary.read_bytes()
+        actual = sha256_hex(written)
+        if actual != digest or len(written) != len(content):
+            logger.error(
+                "partial file path=%s expected=%s actual=%s",
+                temporary,
+                digest,
+                actual,
+            )
+            raise IncompleteFile(temporary, digest, actual)
+        temporary.replace(destination)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
 def store_bytes(
     manifest: Manifest,
     *,
@@ -86,24 +124,34 @@ def store_bytes(
     now: datetime,
     destination: Path,
 ) -> str:
-    """Write `content` unless the manifest already has this checksum.
+    """Write `content` unless the manifest and the file on disk already have this checksum.
 
-    Returns `downloaded`, `unchanged`, or `replaced`.
+    Returns `downloaded`, `unchanged`, `replaced`, or `restored`.
     """
     digest = sha256_hex(content)
     current = manifest.files.get(relative_path)
     if current is not None and current.sha256 == digest:
+        if _disk_matches(destination, digest):
+            observe(current, now, digest)
+            current.local_exists = True
+            logger.info(
+                "unchanged relative_path=%s bytes=%s sha256=%s",
+                relative_path,
+                len(content),
+                digest,
+            )
+            return "unchanged"
+        _write_verified(destination, content, digest)
         observe(current, now, digest)
-        current.local_exists = destination.exists()
+        current.local_exists = True
         logger.info(
-            "unchanged relative_path=%s bytes=%s sha256=%s",
+            "restored relative_path=%s bytes=%s sha256=%s",
             relative_path,
             len(content),
             digest,
         )
-        return "unchanged"
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_bytes(content)
+        return "restored"
+    _write_verified(destination, content, digest)
     record = current or FileRecord(
         relative_path=relative_path,
         sha256=digest,

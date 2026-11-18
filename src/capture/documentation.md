@@ -16,9 +16,9 @@ The command line. `python -m capture download --start … --end …` loads `src/
 
 Fetches the files `shared` asked for and hands the bytes to `store_bytes`.
 
-`urllib_fetcher` treats HTTP 404 as "not published yet" and returns no bytes. Any other HTTP error is raised. Tests pass their own fetcher, so a unit test does not call EMI.
+`urllib_fetcher` treats HTTP 404 as "not published yet" and returns no bytes. Any other HTTP error is raised. A present file must include `Content-Length`, and the number of bytes read must equal it. An empty body is rejected. Tests pass their own fetcher, so a unit test does not call EMI.
 
-`download_prices` asks for the first wave, then a fallback wave of daily files for a past month whose completed monthly file was missing. It drops a daily file when `select_price_files` says a completed monthly file already covers that month, and logs that skip. Every other found file is stored. Files for one trading date share `daily/YYYY-MM-DD/manifest.json`. Files for one month share `monthly/YYYY-MM/manifest.json`. The report lists each path as `downloaded`, `replaced`, `unchanged`, or `missing`.
+`download_prices` asks for the first wave, then a fallback wave of daily files for a past month whose completed monthly file was missing. It drops a daily file when `select_price_files` says a completed monthly file already covers that month, and logs that skip. Every other found file is stored. Files for one trading date share `daily/YYYY-MM-DD/manifest.json`. Files for one month share `monthly/YYYY-MM/manifest.json`. The report lists each path as `downloaded`, `replaced`, `unchanged`, `restored`, or `missing`. The manifest is saved after each file that passes the disk check, so a later failure does not forget a file already verified.
 
 ## `manifest.py`
 
@@ -28,7 +28,7 @@ The checksum gate. One JSON file per trading-date folder or month folder, not on
 
 `Manifest.load` returns an empty manifest when that folder's file is not there yet. `Manifest.save` writes to a temporary file and then replaces the real one, so a failed write does not leave a half-written manifest. A run that stops midway leaves the dates it already saved, and the next run finishes the rest.
 
-`store_bytes` hashes the new bytes. The same hash is not written again. The observation list still records that this poll saw it, and `local_exists` follows whether the CSV is on disk. A new hash replaces the local CSV, clears `uploaded` back to false, and returns `replaced`. The first time a path is seen, it returns `downloaded`.
+`store_bytes` hashes the downloaded bytes, writes them to a `.partial` file, and hashes that file. The CSV is renamed into place only when the two hashes match, and only then does the manifest record the checksum. A mismatch deletes the `.partial` file and leaves the manifest unchanged. The same hash is not written again when the file on disk matches too. A manifest checksum with a missing or different local file is written again and returned as `restored`. A new hash replaces the local CSV, clears `uploaded` back to false, and returns `replaced`. The first time a path is seen, it returns `downloaded`.
 
 ## `cleanup.py`
 
@@ -38,7 +38,7 @@ It reads `data/landing/daily/YYYY-MM-DD/manifest.json` and removes the CSVs in t
 
 ## `tests/test_download.py`
 
-An unchanged checksum is not written again. A changed checksum replaces the local file and clears `uploaded`.
+An unchanged checksum is not written again when the file on disk matches. A short local file is rewritten. A write that does not match the downloaded bytes is left out of the manifest. A changed checksum replaces the local file and clears `uploaded`.
 
 ## `tests/test_cleanup.py`
 
