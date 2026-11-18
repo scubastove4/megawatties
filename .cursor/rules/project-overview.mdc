@@ -37,7 +37,16 @@ src/
   capture/
   ingestion/
   orchestration/
-data/landing/           # gitignored local CSVs
+data/landing/                 # gitignored
+  daily/YYYY-MM-DD/
+    manifest.json
+    YYYYMMDD_FinalEnergyPrices_I.csv
+    YYYYMMDD_FinalEnergyPrices.csv
+    YYYYMMDD_DispatchEnergyPrices.csv   # phase 3, same folder
+  monthly/YYYY-MM/
+    manifest.json
+    YYYYMM_FinalEnergyPrices.csv
+    YYYYMM_FinalEnergyPrices_incomplete.csv
 ```
 
 - **`orchestration`** — Prefect flows only. Poll, call capture, upload to the volume, trigger the Databricks job, then delete local files once that trading date is closed. No HTTP parsing of EMI and no Spark.
@@ -45,7 +54,7 @@ data/landing/           # gitignored local CSVs
 - **`ingestion`** — Job code, bronze, silver, gold, and quality checks. Reads the volume. Does not call EMI. The folder is named for the step, not the vendor, so it does not clash with the Databricks SDK and a later tool can sit beside it. Free Edition serverless cannot be relied on to reach the public blob.
 - **`shared`** — Pure domain rules: expected filenames, interim/final/incomplete rank, NZ business days, trading-period UTC intervals, checksums. No Prefect, Spark, HTTP, or `datetime.now()` inside the pure functions. `capture` and `ingestion` both import this package.
 
-The volume and the Delta tables are the durable copy. The laptop is staging. Local CSVs are deleted only after the job has succeeded and that trading date is closed. The manifest keeps `path`, `bytes`, and `sha256`, so a replaced remote file is downloaded again.
+The volume and the Delta tables are the durable copy. The laptop is staging. Each trading date has `data/landing/daily/YYYY-MM-DD/manifest.json`, and each month has `data/landing/monthly/YYYY-MM/manifest.json`. The manifest keeps `path`, `bytes`, and `sha256`, so a replaced remote file is downloaded again. Local CSVs are deleted only after the job has succeeded and that trading date is closed. The `manifest.json` stays.
 
 Unity Catalog schema: `emi`. Volume: `emi.landing`. The catalog name comes from the Free Edition workspace and is set in `databricks.yml` on first setup. The bundle name is `megawatties`. One target, `dev`, `mode: development`. No service principal.
 
@@ -84,7 +93,7 @@ Reference nodes for published statistics: `BEN2201` (Benmore), `HAY2201` (Haywar
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1 | Capture. Prefect polls. Download interim and final files. Checksum manifest. Local files stay on disk. One smoke upload to the volume. No bronze tables yet. | Planned |
+| 1 | Capture. Prefect polls. Download interim and final files. Checksum manifest. Local files stay on disk. One smoke upload to the volume. No bronze tables yet. | In progress |
 | 2 | Price bronze, versioned silver, `gold.current_price`, change tracking, rolling statistics. Wire the job trigger and local deletion. | Planned |
 | 3 | Dispatch for every node, time-weighted validation, trading-period drill-down. | Planned |
 | 4 | Generation (`Generation_MD`) and one rolling month of offers. Price times estimated injection, not market settlement. | Planned |
@@ -136,16 +145,15 @@ Ask before inventing an answer.
 
 ## Current codebase
 
-The repo is `~/Desktop/Projects/megawatties`. Phase 1 has not started. The seed commit on `main` contains these rules only. Pipeline code belongs on a feature branch cut from `release/phase-1-capture`.
+The repo is `~/Desktop/Projects/megawatties`. Phase 1 is in progress on a feature branch cut from `release/phase-1-capture`.
 
-Planned layout, empty until that work starts:
-
-- `src/orchestration/` — Prefect flow and the three daily polls
-- `src/capture/` — EMI download and the manifest
-- `src/ingestion/` — bronze, silver, quality, gold
-- `src/shared/` — pure filename, rank, calendar, and interval rules
-- `databricks.yml` — bundle root at the repo root
-- `data/landing/` — gitignored local CSVs
+- `src/capture/` — EMI final-energy download, per-folder manifest, and checksums
+- `src/shared/` — pure filename, rank, calendar, and checksum rules
+- `src/log/` — logging setup and `logging.yaml`
+- `data/landing/` — gitignored daily and monthly folders, as in the tree above
+- `src/orchestration/` — not started
+- `src/ingestion/` — not started
+- `databricks.yml` — not started
 
 ## Testing
 
