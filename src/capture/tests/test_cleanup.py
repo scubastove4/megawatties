@@ -20,64 +20,75 @@ def _record(relative_path: str, trading_date: str, status: str, digest: str = "a
     )
 
 
+def _write_day(landing: Path, trading: str, files: dict[str, FileRecord]) -> Path:
+    manifest_path = landing / "daily" / trading / "manifest.json"
+    for relative, record in files.items():
+        destination = landing / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(b"csv")
+        record.local_exists = True
+    Manifest(files=files).save(manifest_path)
+    return manifest_path
+
+
 def test_local_files_stay_until_dispatch_has_settled(tmp_path: Path, caplog) -> None:
     caplog.set_level("INFO", logger="capture")
     landing = tmp_path / "landing"
     trading = "2026-11-10"
-    final_path = f"final_energy/{trading.replace('-', '')}_FinalEnergyPrices.csv"
-    interim_path = f"final_energy/{trading.replace('-', '')}_FinalEnergyPrices_I.csv"
-    dispatch_path = f"dispatch_energy/{trading.replace('-', '')}_DispatchEnergyPrices.csv"
-    for relative in (final_path, interim_path, dispatch_path):
-        destination = landing / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(b"csv")
-    manifest = Manifest(
-        files={
+    final_path = f"daily/{trading}/{trading.replace('-', '')}_FinalEnergyPrices.csv"
+    interim_path = f"daily/{trading}/{trading.replace('-', '')}_FinalEnergyPrices_I.csv"
+    dispatch_path = f"daily/{trading}/{trading.replace('-', '')}_DispatchEnergyPrices.csv"
+    manifest_path = _write_day(
+        landing,
+        trading,
+        {
             final_path: _record(final_path, trading, "final"),
             interim_path: _record(interim_path, trading, "interim"),
             dispatch_path: _record(dispatch_path, trading, "final", digest="dispatch"),
-        }
+        },
     )
     inside = datetime(2026, 11, 12, 18, 30, tzinfo=AUCKLAND)
-    assert delete_closed_files(manifest, landing, inside) == []
+    assert delete_closed_files(landing, inside) == []
     assert (landing / final_path).exists()
 
+    manifest = Manifest.load(manifest_path)
     manifest.files[dispatch_path].observations.append(
         {"at": "2026-11-13T15:30:00+13:00", "sha256": "dispatch"}
     )
+    manifest.save(manifest_path)
     settled = datetime(2026, 11, 13, 15, 30, tzinfo=AUCKLAND)
-    removed = delete_closed_files(manifest, landing, settled)
+    removed = delete_closed_files(landing, settled)
     assert f"deleted relative_path={final_path} trading_date={trading}" in caplog.text
     assert final_path in removed
     assert interim_path in removed
     assert dispatch_path in removed
     assert not (landing / final_path).exists()
+    assert manifest_path.is_file()
+    saved = Manifest.load(manifest_path)
+    assert saved.files[final_path].local_exists is False
+    assert saved.files[dispatch_path].sha256 == "dispatch"
 
 
 def test_files_stay_when_dispatch_is_not_tracked_yet(tmp_path: Path, caplog) -> None:
     landing = tmp_path / "landing"
-    final_path = "final_energy/20261110_FinalEnergyPrices.csv"
-    destination = landing / final_path
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_bytes(b"csv")
+    trading = "2026-11-10"
+    final_path = f"daily/{trading}/20261110_FinalEnergyPrices.csv"
+    manifest_path = _write_day(landing, trading, {final_path: _record(final_path, trading, "final")})
     caplog.set_level("INFO", logger="capture")
-    manifest = Manifest(files={final_path: _record(final_path, "2026-11-10", "final")})
     now = datetime(2026, 11, 20, 9, 30, tzinfo=AUCKLAND)
-    assert delete_closed_files(manifest, landing, now) == []
-    assert destination.exists()
+    assert delete_closed_files(landing, now) == []
+    assert (landing / final_path).exists()
+    assert manifest_path.is_file()
     assert "kept trading_date=2026-11-10 reason=dispatch_not_tracked" in caplog.text
 
 
 def test_files_are_kept_when_the_final_has_not_been_uploaded(tmp_path: Path) -> None:
     landing = tmp_path / "landing"
     trading = "2026-11-10"
-    final_path = "final_energy/20261110_FinalEnergyPrices.csv"
-    destination = landing / final_path
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_bytes(b"csv")
+    final_path = f"daily/{trading}/20261110_FinalEnergyPrices.csv"
     record = _record(final_path, trading, "final")
     record.uploaded = False
-    manifest = Manifest(files={final_path: record})
+    _write_day(landing, trading, {final_path: record})
     now = datetime(2026, 11, 20, 9, 30, tzinfo=AUCKLAND)
-    assert delete_closed_files(manifest, landing, now) == []
-    assert destination.exists()
+    assert delete_closed_files(landing, now) == []
+    assert (landing / final_path).exists()

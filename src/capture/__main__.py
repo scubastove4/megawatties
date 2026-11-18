@@ -9,7 +9,6 @@ from pathlib import Path
 
 from capture.download import download_prices, urllib_fetcher
 from log import configure_logging, get_logger
-from capture.manifest import Manifest
 from shared.calendar import AUCKLAND
 
 logger = get_logger(__name__)
@@ -23,7 +22,6 @@ def main(argv: list[str] | None = None) -> None:
     download.add_argument("--end", required=True, type=date.fromisoformat)
     download.add_argument("--today", type=date.fromisoformat)
     download.add_argument("--landing", type=Path, default=Path("data/landing"))
-    download.add_argument("--manifest", type=Path, default=Path("data/manifest.json"))
     download.add_argument("--log-config", type=Path)
     args = parser.parse_args(argv)
     configure_logging(args.log_config)
@@ -34,23 +32,15 @@ def main(argv: list[str] | None = None) -> None:
 def _download(args: argparse.Namespace) -> None:
     today = args.today or date.today()
     now = datetime.now(AUCKLAND)
-    logger.info(
-        "download landing=%s manifest=%s",
-        args.landing,
-        args.manifest,
-    )
-    manifest = Manifest.load(args.manifest)
+    logger.info("download landing=%s", args.landing)
     download_prices(
         start=args.start,
         end=args.end,
         today=today,
         now=now,
         landing=args.landing,
-        manifest=manifest,
         fetcher=urllib_fetcher,
     )
-    manifest.save(args.manifest)
-    logger.info("wrote manifest path=%s files=%s", args.manifest, len(manifest.files))
 
 
 if __name__ == "__main__":

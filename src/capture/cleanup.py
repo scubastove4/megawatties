@@ -14,16 +14,29 @@ from shared.calendar import dispatch_checksum_settled
 logger = get_logger(__name__)
 
 
-def delete_closed_files(manifest: Manifest, landing: Path, now: datetime) -> list[str]:
+def delete_closed_files(landing: Path, now: datetime) -> list[str]:
+    """Remove closed CSVs. Each trading-date manifest.json stays in place."""
     removed: list[str] = []
-    for relative_path in _closed_relative_paths(manifest, now):
-        record = manifest.files[relative_path]
-        destination = landing / relative_path
-        if destination.exists():
-            destination.unlink()
-        record.local_exists = False
-        removed.append(relative_path)
-        logger.info("deleted relative_path=%s trading_date=%s", relative_path, record.trading_date)
+    daily = landing / "daily"
+    if not daily.is_dir():
+        return removed
+    for day_dir in sorted(path for path in daily.iterdir() if path.is_dir()):
+        manifest_path = day_dir / "manifest.json"
+        if not manifest_path.is_file():
+            continue
+        manifest = Manifest.load(manifest_path)
+        closed = _closed_relative_paths(manifest, now)
+        if not closed:
+            continue
+        for relative_path in closed:
+            record = manifest.files[relative_path]
+            destination = landing / relative_path
+            if destination.exists():
+                destination.unlink()
+            record.local_exists = False
+            removed.append(relative_path)
+            logger.info("deleted relative_path=%s trading_date=%s", relative_path, record.trading_date)
+        manifest.save(manifest_path)
     return removed
 
 
@@ -48,7 +61,7 @@ def _keep_reason(manifest: Manifest, trading_date: str, paths: list[str], now: d
     final_record = None
     for relative_path in paths:
         record = manifest.files[relative_path]
-        if relative_path.startswith("final_energy/") and record.status == "final":
+        if Path(relative_path).name.endswith("_FinalEnergyPrices.csv") and record.status == "final":
             final_record = record
     if final_record is None or not final_record.uploaded:
         return "final_not_uploaded"
@@ -56,7 +69,7 @@ def _keep_reason(manifest: Manifest, trading_date: str, paths: list[str], now: d
     dispatch_paths = [
         path
         for path, record in manifest.files.items()
-        if record.trading_date == trading_date and "dispatch_energy/" in path
+        if record.trading_date == trading_date and Path(path).name.endswith("_DispatchEnergyPrices.csv")
     ]
     if not dispatch_paths:
         return "dispatch_not_tracked"

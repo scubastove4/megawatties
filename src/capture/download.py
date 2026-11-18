@@ -42,7 +42,6 @@ def download_prices(
     today: date,
     now: datetime,
     landing: Path,
-    manifest: Manifest,
     fetcher: Fetcher = urllib_fetcher,
 ) -> DownloadReport:
     logger.info("download start=%s end=%s today=%s", start.isoformat(), end.isoformat(), today.isoformat())
@@ -58,22 +57,31 @@ def download_prices(
     ]
     _fetch_all(second_wave, fetcher, found, report)
     kept = set(select_price_files(list(found)))
+    folders: dict[str, list[tuple[PriceFile, bytes]]] = {}
     for name, content in found.items():
         if name not in kept:
             logger.info("skipped name=%s reason=completed_monthly_file", name)
             continue
         price_file = _price_file_for(name, first_wave + second_wave)
-        outcome = store_bytes(
-            manifest,
-            relative_path=price_file.relative_path,
-            content=content,
-            url=price_file.url,
-            status=price_file.status,
-            trading_date=price_file.trading_date.isoformat() if price_file.trading_date else None,
-            now=now,
-            destination=landing / price_file.relative_path,
-        )
-        getattr(report, outcome).append(price_file.relative_path)
+        folder = str(Path(price_file.relative_path).parent)
+        folders.setdefault(folder, []).append((price_file, content))
+    for folder, items in folders.items():
+        manifest_path = landing / folder / "manifest.json"
+        manifest = Manifest.load(manifest_path)
+        for price_file, content in items:
+            outcome = store_bytes(
+                manifest,
+                relative_path=price_file.relative_path,
+                content=content,
+                url=price_file.url,
+                status=price_file.status,
+                trading_date=price_file.trading_date.isoformat() if price_file.trading_date else None,
+                now=now,
+                destination=landing / price_file.relative_path,
+            )
+            getattr(report, outcome).append(price_file.relative_path)
+        manifest.save(manifest_path)
+        logger.info("wrote manifest path=%s files=%s", manifest_path, len(manifest.files))
     logger.info(
         "download finished downloaded=%s replaced=%s unchanged=%s missing=%s",
         len(report.downloaded),

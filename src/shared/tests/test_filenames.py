@@ -47,11 +47,13 @@ def test_past_year_requests_monthly_files_and_falls_back_to_dailies() -> None:
     start = date(2025, 10, 1)
     end = date(2025, 10, 2)
     today = date(2026, 11, 18)
-    initial = [item.name for item in initial_price_requests(start, end, today)]
+    requested = initial_price_requests(start, end, today)
+    initial = [item.name for item in requested]
     assert initial == [
         "202510_FinalEnergyPrices.csv",
         "202510_FinalEnergyPrices_incomplete.csv",
     ]
+    assert requested[0].relative_path == "monthly/2025-10/202510_FinalEnergyPrices.csv"
     fallback = [item.name for item in fallback_daily_requests(start, end, today, found_names=set())]
     assert "20251001_FinalEnergyPrices.csv" in fallback
     assert "20251002_FinalEnergyPrices_I.csv" in fallback
@@ -63,8 +65,9 @@ def test_current_year_requests_daily_interim_and_final_files() -> None:
     start = date(2026, 11, 11)
     end = date(2026, 11, 11)
     today = date(2026, 11, 18)
-    names = [item.name for item in initial_price_requests(start, end, today)]
-    assert names == [
+    requested = initial_price_requests(start, end, today)
+    assert [item.name for item in requested] == [
         "20261111_FinalEnergyPrices.csv",
         "20261111_FinalEnergyPrices_I.csv",
     ]
+    assert requested[0].relative_path == "daily/2026-11-11/20261111_FinalEnergyPrices.csv"

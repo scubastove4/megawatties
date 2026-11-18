@@ -25,8 +25,10 @@ class PriceFile:
     @property
     def relative_path(self) -> str:
         if self.kind == "monthly":
-            return f"final_energy/ByMonth/{self.name}"
-        return f"final_energy/{self.name}"
+            return f"monthly/{self.month[:4]}-{self.month[4:]}/{self.name}"
+        if self.trading_date is None:
+            raise ValueError(f"daily price file has no trading date: {self.name}")
+        return f"daily/{self.trading_date.isoformat()}/{self.name}"
 
 
 def parse_price_filename(name: str) -> PriceFile:
