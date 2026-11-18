@@ -18,4 +18,8 @@ def configure_logging(path: Path | None = None) -> None:
     payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"logging config must be a mapping: {config_path}")
+    for handler in payload.get("handlers", {}).values():
+        filename = handler.get("filename")
+        if isinstance(filename, str) and filename:
+            Path(filename).parent.mkdir(parents=True, exist_ok=True)
     dictConfig(payload)

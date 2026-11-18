@@ -202,3 +202,32 @@ def test_urllib_fetcher_rejects_a_short_response(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr("capture.download.urllib.request.urlopen", lambda *args, **kwargs: _Response())
     with pytest.raises(IncompleteDownload):
         urllib_fetcher(url)
+
+
+def test_missing_interim_is_quiet_once_the_final_is_in_hand(tmp_path: Path, caplog) -> None:
+    caplog.set_level("INFO", logger="capture")
+    landing = tmp_path / "landing"
+    requested: list[str] = []
+    files = {
+        "20261116_FinalEnergyPrices.csv": b"final\n",
+        "20261117_FinalEnergyPrices_I.csv": b"interim\n",
+    }
+
+    def fetch(url: str) -> bytes | None:
+        name = url.rsplit("/", 1)[-1]
+        requested.append(name)
+        return files.get(name)
+
+    report = download_prices(
+        start=date(2026, 11, 16),
+        end=date(2026, 11, 17),
+        today=date(2026, 11, 18),
+        now=datetime(2026, 11, 18, 9, 30, tzinfo=AUCKLAND),
+        landing=landing,
+        fetcher=fetch,
+    )
+    assert "20261116_FinalEnergyPrices_I.csv" in requested
+    assert "20261116_FinalEnergyPrices_I.csv" not in report.missing
+    assert "missing name=20261116_FinalEnergyPrices_I.csv" not in caplog.text
+    assert report.missing == ["20261117_FinalEnergyPrices.csv"]
+    assert "missing name=20261117_FinalEnergyPrices.csv" in caplog.text

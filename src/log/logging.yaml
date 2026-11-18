@@ -8,6 +8,11 @@ handlers:
     class: logging.StreamHandler
     formatter: plain
     stream: ext://sys.stderr
+  file:
+    class: logging.FileHandler
+    formatter: plain
+    filename: logs/capture.log
+    mode: a
 root:
   level: INFO
-  handlers: [console]
+  handlers: [console, file]

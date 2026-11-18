@@ -124,10 +124,20 @@ def _fetch_all(
             continue
         body = fetcher(item.url)
         if body is None:
+            if _final_already_found(item, found):
+                continue
             report.missing.append(item.name)
             logger.info("missing name=%s url=%s", item.name, item.url)
             continue
         found[item.name] = body
+
+
+def _final_already_found(item: PriceFile, found: dict[str, bytes]) -> bool:
+    """A missing interim is expected once that day's final has been published."""
+    if item.status != "interim" or not item.name.endswith("_FinalEnergyPrices_I.csv"):
+        return False
+    final_name = item.name.replace("_FinalEnergyPrices_I.csv", "_FinalEnergyPrices.csv")
+    return final_name in found
 
 
 def _price_file_for(name: str, requests: list[PriceFile]) -> PriceFile:
