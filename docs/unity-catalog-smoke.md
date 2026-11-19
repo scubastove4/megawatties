@@ -85,7 +85,7 @@ List the uploaded file and compare its size with the local file:
 databricks fs ls -l \
   dbfs:/Volumes/workspace/emi/landing/daily/2026-11-10 \
   --profile megawatties
-  
+
 ls -l data/landing/daily/2026-11-10/20261110_FinalEnergyPrices.csv
 ```
 
@@ -93,6 +93,54 @@ Also open that file in Catalog Explorer. The two sizes should match.
 
 ## 7. Stop
 
-Leave the other dates on the laptop. Leave `uploaded` false in the manifests until this one file is visible in the volume and the sizes match. Local CSVs stay. The manifest stays either way.
+The 10 November file is in the volume and its manifest has `uploaded` set to true. Leave the other dates on the laptop. Local CSVs stay. The manifests stay.
 
-`databricks.yml` is the next file, and it records the catalog name from step 2. Bronze tables are a later phase.
+## 8. Create the bundle
+
+Create `databricks.yml` at the repo root. The file format is in [Declarative Automation Bundles configuration](https://docs.databricks.com/aws/en/dev-tools/bundles/settings), and every key is listed in the [configuration reference](https://docs.databricks.com/aws/en/dev-tools/bundles/reference). It names the bundle, the one development target, and the catalog from step 2. It does not contain a token. The `megawatties` profile in `~/.databrickscfg` supplies the login.
+
+```yaml
+bundle:
+  name: megawatties
+
+variables:
+  catalog:
+    description: Unity Catalog catalog for this Free Edition workspace.
+    default: workspace
+  schema:
+    description: Schema that holds the EMI landing volume.
+    default: emi
+  landing_volume:
+    description: Volume that stores the staged CSVs.
+    default: landing
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://dbc-ed37dda6-cb93.cloud.databricks.com
+      profile: megawatties
+```
+
+Add this line to `.gitignore` so local bundle state is not committed:
+
+```text
+.databricks/
+```
+
+From the repo root, check the file:
+
+```bash
+databricks bundle validate --target dev --profile megawatties
+```
+
+Validation reads the file and checks that the profile can see the workspace. It does not upload files or create jobs. A successful check prints `Validation OK!` and a workspace path under your user folder.
+
+Deploy only after that succeeds:
+
+```bash
+databricks bundle deploy --target dev --profile megawatties
+```
+
+Deploy with no jobs writes bundle state under `.databricks/` on the laptop and creates the development folder in the workspace. It does not create tables. Bronze tables are a later phase.

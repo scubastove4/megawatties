@@ -8,3 +8,4 @@ dist/
 data/
 logs/
 .idea/
+.databricks/
