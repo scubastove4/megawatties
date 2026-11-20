@@ -22,6 +22,8 @@ NZ business-day deadlines. Pass `now` in. A naive datetime is rejected.
 
 The final for a trading date is due at 15:30 Pacific/Auckland on the next business day. Weekends and New Zealand public holidays are skipped, so a Friday trading date is due at 15:30 on Monday. `final_energy_due` is true once that moment has been reached.
 
+`trading_period_window` is the seven calendar days ending on the date it is given, inclusive. A poll on 20 November asks for 14 November through 20 November.
+
 Dispatch stays open until 09:30 Pacific/Auckland on trading-date + 3 calendar days. `dispatch_checksum_settled` is true only after that morning, with at least two observations, the last two checksums equal, and the latest observation at or after that morning. A changed checksum on the later poll keeps the file open.
 
 ## `checksums.py`
@@ -38,4 +40,4 @@ A completed monthly file suppresses that month's daily files. An `_incomplete` f
 
 ## `tests/test_calendar.py`
 
-The Friday 13 November 2026 final is not due at 15:29 on Monday 16 November, and is due at 15:30. Dispatch for 10 November 2026 stays open on 12 November. It settles on 13 November once a later poll repeats the checksum, and stays open when that later checksum differs.
+The window for 20 November 2026 is 14 November through 20 November. The Friday 13 November 2026 final is not due at 15:29 on Monday 16 November, and is due at 15:30. Dispatch for 10 November 2026 stays open on 12 November. It settles on 13 November once a later poll repeats the checksum, and stays open when that later checksum differs.

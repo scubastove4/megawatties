@@ -12,9 +12,13 @@ dependencies = [
 dev = [
     "pytest>=8",
 ]
+orchestration = [
+    "prefect>=3.4.25",
+]
 
 [project.scripts]
 megawatties-capture = "capture.__main__:main"
+megawatties-poll = "orchestration.__main__:main"
 
 [build-system]
 requires = ["setuptools>=68"]

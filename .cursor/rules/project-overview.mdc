@@ -113,7 +113,7 @@ Branch names for these phases live in `git-branching.mdc`. Do not redefine the p
 ## Concrete tuning values
 
 - **Polls:** 9:30, 15:30, and 18:30 in `Pacific/Auckland`. The 15:30 run is the one after the 2pm final-price deadline. The first runs record whether the morning file is already present at 9:30, and whether the interim checksum changes across the three runs.
-- **Lookback:** seven calendar days for trading-period files, five for dispatch files.
+- **Lookback:** seven calendar days for trading-period files, ending on the Auckland date, inclusive. Five calendar days for dispatch files.
 - **Final-price deadline:** 2pm NZ on the next business day. Weekends and NZ public holidays are skipped. A Friday trading date is due Monday at 15:30. A pricing-error claim can push it later.
 - **Dispatch settlement:** treat the file as open until the morning after trading-date + 3 calendar days. Delete the local CSV only when the final trading-period file is in `emi.ingested_files`, the dispatch file is ingested, today is at least trading-date + 3 calendar days, and a later poll saw the same checksum.
 - **Ranks:** final 3, incomplete 2, interim 1.
@@ -146,16 +146,17 @@ Ask before inventing an answer.
 
 Update this file after a design decision and before the code for that decision. Change the section the decision touches: the roadmap, the data design, an open question, or this section. Before opening the pull request, follow step 3 in `git-branching.mdc`.
 
-The repo is `~/Desktop/Projects/megawatties`. Phase 1 is in progress on `feature/capture-data-download`, cut from `release/phase-1-capture`. Capture, the landing folders, and the Free Edition bundle are in place. Prefect is not started.
+The repo is `~/Desktop/Projects/megawatties`. Phase 1 is in progress on `feature/orchestration-prefect`, cut from `release/phase-1-capture`. Capture, the landing folders, the Free Edition bundle, and the Prefect poll are in place. The poll does not upload or delete.
 
-- `src/capture/` — EMI final-energy download, per-folder manifest, and checksums. Laptop only. Excluded from the bundle.
-- `src/shared/` — pure filename, rank, calendar, and checksum rules. Deployed for the later ingestion job.
+- `src/capture/` — EMI final-energy download, per-folder manifest, and checksums. Laptop only. Excluded from the bundle. `--start` and `--end` are still required.
+- `src/shared/` — pure filename, rank, calendar, and checksum rules. Deployed for the later ingestion job. `trading_period_window` is the seven-day poll window.
 - `src/log/` — logging setup and `logging.yaml`. Deployed with `shared`.
 - `data/landing/` — gitignored daily and monthly folders, as in the tree above. `daily/2026-11-10/20261110_FinalEnergyPrices.csv` is in the volume, and that manifest has `uploaded` set to true. The other dates stay on the laptop.
 - `docs/databricks-setup.md` — Free Edition setup, the one-file volume copy, and the `dev` bundle.
-- `src/orchestration/` — not started
+- `src/orchestration/` — Prefect poll at 9:30, 15:30, and 18:30 Pacific/Auckland. Calls capture for the seven-day window. Laptop only. Excluded from the bundle. Does not upload or delete.
 - `src/ingestion/` — not started
-- `databricks.yml` — bundle root. Target `dev`, mode `development`, catalog `workspace`, schema `emi`, volume `landing`. Sync excludes `.cursor/`, `docs/`, `src/capture/`, `README.md`, and `.gitignore`. No jobs yet.
+- `databricks.yml` — bundle root. Target `dev`, mode `development`, catalog `workspace`, schema `emi`, volume `landing`. Sync excludes `.cursor/`, `docs/`, `src/capture/`, `src/orchestration/`, `README.md`, and `.gitignore`. No jobs yet.
+- Before phase 1 closes: `python -m capture download` with no `--start` or `--end` uses the seven calendar days ending on today's Auckland date. On 20 November that is 14 November through 20 November, weekends included. Passing `--start` and `--end` still downloads that explicit range.
 
 ## Testing
 
@@ -168,7 +169,7 @@ The repo is `~/Desktop/Projects/megawatties`. Phase 1 is in progress on `feature
 
 - Local Python is 3.14. Prefect 3.4.25 and later supports it. Pin the laptop environment to 3.14.
 - Databricks serverless runs Python 3.12.3 (environment versions 4 through 6). `shared` and `ingestion` execute there, so those packages stay compatible with 3.12: no 3.13-only or 3.14-only syntax. Ship them as a pure-Python wheel. `capture` and `orchestration` run only on the laptop.
-- Prefect 3, local UI, timezone `Pacific/Auckland`.
+- Prefect 3.4.25 or later, local UI, timezone `Pacific/Auckland`. Install it with the laptop extra: `pip install -e ".[orchestration]"`. Databricks does not install that extra.
 - Databricks CLI authenticated to the Free Edition workspace. `databricks bundle deploy` and a Jobs API trigger are the deploy path.
 - Databricks workspace changes are steps for the user to run: bundle deploy, volume upload, SQL, jobs, and warehouses. Write those steps in `docs/`, in a new file when the work is a different kind from `docs/databricks-setup.md`, and wait. Capture and Prefect work on the laptop can be implemented directly.
 - Do not commit `.env`, CLI profiles, or tokens.

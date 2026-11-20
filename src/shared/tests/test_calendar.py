@@ -1,6 +1,18 @@
 from datetime import date, datetime
 
-from shared.calendar import AUCKLAND, dispatch_checksum_settled, dispatch_window_open, final_energy_due
+from shared.calendar import (
+    AUCKLAND,
+    dispatch_checksum_settled,
+    dispatch_window_open,
+    final_energy_due,
+    trading_period_window,
+)
+
+
+def test_trading_period_window_is_seven_days_ending_today() -> None:
+    start, end = trading_period_window(date(2026, 11, 20))
+    assert start == date(2026, 11, 14)
+    assert end == date(2026, 11, 20)
 
 
 def test_friday_final_is_due_monday_at_1530() -> None:

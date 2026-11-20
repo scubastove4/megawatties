@@ -119,6 +119,7 @@ sync:
     - .cursor/
     - docs/
     - src/capture/
+    - src/orchestration/
     - README.md
     - .gitignore
 
@@ -153,7 +154,7 @@ databricks bundle deploy --target dev --profile megawatties
 
 Deploy with no jobs writes bundle state under `.databricks/` on the laptop and creates the development folder in the workspace. It does not create tables. Bronze tables are a later phase.
 
-The `sync.exclude` list keeps laptop-only paths out of that folder. `.cursor/`, `docs/`, `src/capture/`, `README.md`, and `.gitignore` stay on the laptop. `src/shared/`, `src/log/`, and `pyproject.toml` still deploy. Ingestion will import `shared` and `log` on Databricks. Capture keeps running on the laptop.
+The `sync.exclude` list keeps laptop-only paths out of that folder. `.cursor/`, `docs/`, `src/capture/`, `src/orchestration/`, `README.md`, and `.gitignore` stay on the laptop. `src/shared/`, `src/log/`, and `pyproject.toml` still deploy. Ingestion will import `shared` and `log` on Databricks. Capture and Prefect keep running on the laptop. The next deploy leaves `src/orchestration/` out of `files`. That deploy can wait until the next Databricks change.
 
 ## 9. Redeploy and check the files
 
@@ -170,6 +171,7 @@ These paths should be gone:
 - `.cursor/`
 - `docs/`
 - `src/capture/`
+- `src/orchestration/`
 - `README.md`
 - `.gitignore`
 
