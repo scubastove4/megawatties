@@ -170,6 +170,7 @@ The repo is `~/Desktop/Projects/megawatties`. Phase 1 is in progress on `feature
 - Databricks serverless runs Python 3.12.3 (environment versions 4 through 6). `shared` and `ingestion` execute there, so those packages stay compatible with 3.12: no 3.13-only or 3.14-only syntax. Ship them as a pure-Python wheel. `capture` and `orchestration` run only on the laptop.
 - Prefect 3, local UI, timezone `Pacific/Auckland`.
 - Databricks CLI authenticated to the Free Edition workspace. `databricks bundle deploy` and a Jobs API trigger are the deploy path.
+- Databricks workspace changes are steps for the user to run: bundle deploy, volume upload, SQL, jobs, and warehouses. Write those steps in `docs/`, in a new file when the work is a different kind from `docs/databricks-setup.md`, and wait. Capture and Prefect work on the laptop can be implemented directly.
 - Do not commit `.env`, CLI profiles, or tokens.
 
 ## Branching
