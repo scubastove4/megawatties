@@ -50,13 +50,13 @@ data/landing/                 # gitignored
 ```
 
 - **`orchestration`** — Prefect flows only. Poll, call capture, upload to the volume, trigger the Databricks job, then delete local files once that trading date is closed. No HTTP parsing of EMI and no Spark.
-- **`capture`** — Download EMI files (and, later, Open-Meteo). Manifest, checksums, and the local staging files. No Spark and no Databricks SDK.
+- **`capture`** — Download EMI files (and, later, Open-Meteo). Manifest, checksums, and the local staging files. No Spark and no Databricks SDK. The bundle excludes this package. It runs on the laptop.
 - **`ingestion`** — Job code, bronze, silver, gold, and quality checks. Reads the volume. Does not call EMI. The folder is named for the step, not the vendor, so it does not clash with the Databricks SDK and a later tool can sit beside it. Free Edition serverless cannot be relied on to reach the public blob.
 - **`shared`** — Pure domain rules: expected filenames, interim/final/incomplete rank, NZ business days, trading-period UTC intervals, checksums. No Prefect, Spark, HTTP, or `datetime.now()` inside the pure functions. `capture` and `ingestion` both import this package.
 
 The volume and the Delta tables are the durable copy. The laptop is staging. Each trading date has `data/landing/daily/YYYY-MM-DD/manifest.json`, and each month has `data/landing/monthly/YYYY-MM/manifest.json`. The manifest keeps `path`, `bytes`, and `sha256`, so a replaced remote file is downloaded again. Local CSVs are deleted only after the job has succeeded and that trading date is closed. The `manifest.json` stays.
 
-Unity Catalog schema: `emi`. Volume: `emi.landing`. The catalog name comes from the Free Edition workspace and is set in `databricks.yml` on first setup. The bundle name is `megawatties`. One target, `dev`, `mode: development`. No service principal.
+Unity Catalog catalog: `workspace`. Schema: `emi`. Volume: `workspace.emi.landing`. The bundle name is `megawatties`. One target, `dev`, `mode: development`. No service principal. Setup steps are in `docs/databricks-setup.md`.
 
 ## Data design
 
@@ -64,7 +64,7 @@ Unity Catalog schema: `emi`. Volume: `emi.landing`. The catalog name comes from 
 
 **Silver prices** keep every version, including an interim that arrives after a final. Grain: `(point_of_connection, trading_date, trading_period, source_file, checksum)`. Each row has `status_rank`, `ingested_at`, and the UTC interval start and end.
 
-Status rank, from the filename: final 3, incomplete 2, interim 1. Confirmed bulk columns are expected to be `TradingDate`, `TradingPeriod`, `PointOfConnection`, `DollarsPerMegawattHour`. Confirm the header on the first real file. Parse `yyyy-mm-dd` and `dd/mm/yyyy`. Prices may be negative.
+Status rank, from the filename: final 3, incomplete 2, interim 1. The November 2026 daily files use `TradingDate`, `TradingPeriod`, `PointOfConnection`, `DollarsPerMegawattHour`, with `TradingDate` as `yyyy-mm-dd`. Parse `yyyy-mm-dd` and `dd/mm/yyyy`. Prices may be negative.
 
 **Current price** is the view `gold.current_price`. One row per node, trading date, and trading period. Final wins. Within the same status, the latest ingest wins.
 
@@ -137,23 +137,23 @@ Out of scope: SPD case files, GDX files, bids, reserve prices, forecast prices, 
 
 Ask before inventing an answer.
 
-- Bulk final-price CSV header, date format, and any headerless files.
+- What `ByMonth/` contains, including its header and date format, before relying on it for a final-price backfill. The November 2026 daily header and `yyyy-mm-dd` dates are confirmed.
 - Whether `PublishDateTime` marks the start or the end of a dispatch interval.
 - Whether the current day's interim checksum changes across the three daily polls.
-- What `ByMonth/` contains before relying on it for a final-price backfill.
 - Node-to-region labels beyond the three reference nodes.
 
 ## Current codebase
 
-The repo is `~/Desktop/Projects/megawatties`. Phase 1 is in progress on a feature branch cut from `release/phase-1-capture`.
+The repo is `~/Desktop/Projects/megawatties`. Phase 1 is in progress on `feature/capture-data-download`, cut from `release/phase-1-capture`. Capture, the landing folders, and the Free Edition bundle are in place. Prefect is not started.
 
-- `src/capture/` — EMI final-energy download, per-folder manifest, and checksums
-- `src/shared/` — pure filename, rank, calendar, and checksum rules
-- `src/log/` — logging setup and `logging.yaml`
-- `data/landing/` — gitignored daily and monthly folders, as in the tree above
+- `src/capture/` — EMI final-energy download, per-folder manifest, and checksums. Laptop only. Excluded from the bundle.
+- `src/shared/` — pure filename, rank, calendar, and checksum rules. Deployed for the later ingestion job.
+- `src/log/` — logging setup and `logging.yaml`. Deployed with `shared`.
+- `data/landing/` — gitignored daily and monthly folders, as in the tree above. `daily/2026-11-10/20261110_FinalEnergyPrices.csv` is in the volume, and that manifest has `uploaded` set to true. The other dates stay on the laptop.
+- `docs/databricks-setup.md` — Free Edition setup, the one-file volume copy, and the `dev` bundle.
 - `src/orchestration/` — not started
 - `src/ingestion/` — not started
-- `databricks.yml` — not started
+- `databricks.yml` — bundle root. Target `dev`, mode `development`, catalog `workspace`, schema `emi`, volume `landing`. Sync excludes `.cursor/`, `docs/`, `src/capture/`, `README.md`, and `.gitignore`. No jobs yet.
 
 ## Testing
 

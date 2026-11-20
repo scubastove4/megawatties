@@ -1,8 +1,8 @@
-# Unity Catalog smoke upload
+# Databricks setup
 
-One local CSV is copied into a Unity Catalog volume. This does not create tables, upload the rest of the landing zone, or delete anything on the laptop.
+Free Edition workspace, CLI login, the `emi` schema and landing volume, one smoke copy, and the `dev` bundle. The smoke copy does not create tables, upload the rest of the landing zone, or delete anything on the laptop.
 
-The catalog name comes from the Free Edition workspace. The schema is `emi`. The volume is `emi.landing`. The bundle file `databricks.yml` is written after the catalog name is known. No service principal, no token in the repo, and no second SQL warehouse.
+The catalog on this workspace is `workspace`. The schema is `emi`. The volume is `emi.landing`. No service principal, no token in the repo, and no second SQL warehouse.
 
 ## 1. Create the Free Edition workspace
 
