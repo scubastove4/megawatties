@@ -144,6 +144,8 @@ Ask before inventing an answer.
 
 ## Current codebase
 
+Update this file after a design decision and before the code for that decision. Change the section the decision touches: the roadmap, the data design, an open question, or this section. Before opening the pull request, follow step 3 in `git-branching.mdc`.
+
 The repo is `~/Desktop/Projects/megawatties`. Phase 1 is in progress on `feature/capture-data-download`, cut from `release/phase-1-capture`. Capture, the landing folders, and the Free Edition bundle are in place. Prefect is not started.
 
 - `src/capture/` — EMI final-energy download, per-folder manifest, and checksums. Laptop only. Excluded from the bundle.
