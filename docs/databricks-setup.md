@@ -8,7 +8,7 @@ The catalog on this workspace is `workspace`. The schema is `emi`. The volume is
 
 Sign up from [Databricks Free Edition](https://docs.databricks.com/aws/en/getting-started/free-edition). Choose Free Edition, not a trial and not the retired Community Edition.
 
-When the workspace opens, copy the browser address. It looks like `https://dbc-xxxxxxxx-xxxx.cloud.databricks.com`. That host is what the CLI logs in to.
+When the workspace opens, copy the browser address. It looks like `https://dbc-ed37dda6-cb93.cloud.databricks.com`. That host is what the CLI logs in to.
 
 ## 2. Find the catalog
 
@@ -25,7 +25,7 @@ On this Mac, Homebrew is already installed:
 ```bash
 brew tap databricks/tap
 brew trust databricks/tap
-xcode-select --install (run is xcode cli is not installed)
+xcode-select --install (run if xcode cli is not installed)
 brew install databricks
 databricks version
 ```
