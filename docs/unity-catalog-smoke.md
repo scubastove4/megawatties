@@ -114,6 +114,14 @@ variables:
     description: Volume that stores the staged CSVs.
     default: landing
 
+sync:
+  exclude:
+    - .cursor/
+    - docs/
+    - src/capture/
+    - README.md
+    - .gitignore
+
 targets:
   dev:
     mode: development
@@ -144,3 +152,45 @@ databricks bundle deploy --target dev --profile megawatties
 ```
 
 Deploy with no jobs writes bundle state under `.databricks/` on the laptop and creates the development folder in the workspace. It does not create tables. Bronze tables are a later phase.
+
+The `sync.exclude` list keeps laptop-only paths out of that folder. `.cursor/`, `docs/`, `src/capture/`, `README.md`, and `.gitignore` stay on the laptop. `src/shared/`, `src/log/`, and `pyproject.toml` still deploy. Ingestion will import `shared` and `log` on Databricks. Capture keeps running on the laptop.
+
+## 9. Redeploy and check the files
+
+From the repo root, deploy again so the exclude list takes effect:
+
+```bash
+databricks bundle deploy --target dev --profile megawatties
+```
+
+In the workspace, open `Users / smorello4@gmail.com / .bundle / megawatties / dev / files`.
+
+These paths should be gone:
+
+- `.cursor/`
+- `docs/`
+- `src/capture/`
+- `README.md`
+- `.gitignore`
+
+These paths should still be there:
+
+- `src/shared/`
+- `src/log/`
+- `pyproject.toml`
+- `databricks.yml`
+
+`artifacts` stays empty. This deploy still does not create a job or a table. The 10 November CSV stays where step 6 put it.
+
+## 10. Stop
+
+The smoke upload is done. One file is in `workspace.emi.landing`. The bundle deploys to the `dev` folder and leaves capture on the laptop. Leave the other dates on the laptop. Do not create a table.
+
+Phase 1 still needs the Prefect schedule, on this feature branch. That work stays on the laptop:
+
+- Prefect 3, local UI, timezone `Pacific/Auckland`.
+- Polls at 9:30, 15:30, and 18:30.
+- Each poll runs the existing capture download over the seven-day lookback.
+- Local CSVs and manifests stay. A poll should record the same outcomes as a manual download: downloaded, unchanged, replaced, or restored.
+
+Do not upload the other dates, trigger a Databricks job, or delete local CSVs in that work. Those wait for phase 2, with the bronze, silver, and gold tables. The job that reads this volume is part of that phase.

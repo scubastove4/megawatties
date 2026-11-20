@@ -12,6 +12,14 @@ variables:
     description: Volume that stores the staged CSVs.
     default: landing
 
+sync:
+  exclude:
+    - .cursor/
+    - docs/
+    - src/capture/
+    - README.md
+    - .gitignore
+
 targets:
   dev:
     mode: development
