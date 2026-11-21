@@ -20,7 +20,7 @@ The Prefect flow `poll-prices`. It reads the Auckland clock, then calls `run_pol
 
 ## `__main__.py`
 
-`python -m orchestration poll` runs one poll now. `python -m orchestration serve` starts the schedule and the local Prefect UI process. `--landing` changes the folder for one poll. `--log-config` points at a different logging file. Both commands load `src/log/logging.yaml`.
+`python -m orchestration poll` runs one poll now. It deletes per-run logs strictly older than seven days, then writes `logs/capture/YYYYMMDDTHHMMSS.log` for this run. `python -m orchestration serve` starts the schedule, and each scheduled run does that same log cleanup before the download. `--landing` changes the folder for one poll. `--log-config` points at a different logging file for one poll.
 
 ## `tests/test_poll.py`
 

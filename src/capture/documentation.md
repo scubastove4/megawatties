@@ -8,7 +8,7 @@ Marks `capture` as the package that downloads final-energy CSVs. It has no funct
 
 ## `__main__.py`
 
-The command line. `python -m capture download --start … --end …` loads `src/log/logging.yaml`, calls `download_prices`, and leaves each trading date or month with its own `manifest.json` under `data/landing`.
+The command line. `python -m capture download --start … --end …` loads `src/log/logging.yaml`, opens a per-run log, calls `download_prices`, and leaves each trading date or month with its own `manifest.json` under `data/landing`.
 
 `--today` defaults to the laptop's current date and decides whether a date is asked for as a daily file or a `ByMonth` file. `--landing` is `data/landing`. `--log-config` points at a different logging file when you pass one. The clock read for the manifest observation lives here, in Auckland time, and is passed into the download.
 
@@ -16,7 +16,7 @@ The command line. `python -m capture download --start … --end …` loads `src/
 
 Fetches the files `shared` asked for and hands the bytes to `store_bytes`.
 
-`urllib_fetcher` treats HTTP 404 as "not published yet" and returns no bytes. Any other HTTP error is raised. A present file must include `Content-Length`, and the number of bytes read must equal it. An empty body is rejected. A missing interim is left out of the log when that day's final was downloaded. The interim is still requested, so a late interim beside a final is kept. A missing final is still logged. Tests pass their own fetcher, so a unit test does not call EMI. The command logs to the console and to `logs/capture.log`.
+`urllib_fetcher` treats HTTP 404 as "not published yet" and returns no bytes. Any other HTTP error is raised. A present file must include `Content-Length`, and the number of bytes read must equal it. An empty body is rejected. A missing interim is left out of the log when that day's final was downloaded. The interim is still requested, so a late interim beside a final is kept. A missing final is still logged. Tests pass their own fetcher, so a unit test does not call EMI. The command logs to the console and to `logs/capture/YYYYMMDDTHHMMSS.log`, named with the Auckland time of that run. A run deletes per-run logs strictly older than seven days. `logs/poll.out.log` and `logs/poll.err.log` are left in place.
 
 `download_prices` asks for the first wave, then a fallback wave of daily files for a past month whose completed monthly file was missing. It drops a daily file when `select_price_files` says a completed monthly file already covers that month, and logs that skip. Every other found file is stored. Files for one trading date share `daily/YYYY-MM-DD/manifest.json`. Files for one month share `monthly/YYYY-MM/manifest.json`. The report lists each path as `downloaded`, `replaced`, `unchanged`, `restored`, or `missing`. The manifest is saved after each file that passes the disk check, so a later failure does not forget a file already verified.
 

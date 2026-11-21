@@ -6,15 +6,16 @@ from pathlib import Path
 from prefect import flow
 from prefect.schedules import Cron
 
-from log import configure_logging
+from log import prepare_run_log
 from orchestration.poll import POLL_CRON, POLL_TIMEZONE, run_poll
 from shared.calendar import AUCKLAND
 
 
 @flow(name="poll-prices")
 def poll_prices(landing: str = "data/landing") -> None:
-    configure_logging()
-    run_poll(now=datetime.now(AUCKLAND), landing=Path(landing))
+    now = datetime.now(AUCKLAND)
+    prepare_run_log(now)
+    run_poll(now=now, landing=Path(landing))
 
 
 def serve_poll() -> None:

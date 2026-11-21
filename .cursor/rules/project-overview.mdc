@@ -144,13 +144,19 @@ Ask before inventing an answer.
 
 ## Current codebase
 
-Update this file after a design decision and before the code for that decision. Change the section the decision touches: the roadmap, the data design, an open question, or this section. Before opening the pull request, follow step 3 in `git-branching.mdc`.
+Write the design decision into this file first. Then write the code. The order is:
+
+1. Record the decision in the section it changes: the roadmap, the data design, an open question, or this section.
+2. Stop there until that edit is in the file.
+3. Write the code that carries out the recorded decision.
+
+Before opening the pull request, follow step 3 in `git-branching.mdc`.
 
 The repo is `~/Desktop/Projects/megawatties`. Phase 1 is in progress on `feature/orchestration-prefect`, cut from `release/phase-1-capture`. Capture, the landing folders, the Free Edition bundle, and the Prefect poll are in place. The poll does not upload or delete.
 
 - `src/capture/` — EMI final-energy download, per-folder manifest, and checksums. Laptop only. Excluded from the bundle. `--start` and `--end` are still required.
 - `src/shared/` — pure filename, rank, calendar, and checksum rules. Deployed for the later ingestion job. `trading_period_window` is the seven-day poll window.
-- `src/log/` — logging setup and `logging.yaml`. Deployed with `shared`.
+- `src/log/` — logging setup and `logging.yaml`. Each capture or poll run writes `logs/capture/YYYYMMDDTHHMMSS.log` and deletes per-run logs strictly older than seven days. Deployed with `shared`.
 - `data/landing/` — gitignored daily and monthly folders, as in the tree above. `daily/2026-11-10/20261110_FinalEnergyPrices.csv` is in the volume, and that manifest has `uploaded` set to true. The other dates stay on the laptop.
 - `docs/databricks-setup.md` — Free Edition setup, the one-file volume copy, and the `dev` bundle.
 - `src/orchestration/` — Prefect poll at 9:30, 15:30, and 18:30 Pacific/Auckland. Calls capture for the seven-day window. Laptop only. Excluded from the bundle. Does not upload or delete.

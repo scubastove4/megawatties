@@ -8,7 +8,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from capture.download import download_prices, urllib_fetcher
-from log import configure_logging, get_logger
+from log import get_logger, prepare_run_log
 from shared.calendar import AUCKLAND
 
 logger = get_logger(__name__)
@@ -24,14 +24,14 @@ def main(argv: list[str] | None = None) -> None:
     download.add_argument("--landing", type=Path, default=Path("data/landing"))
     download.add_argument("--log-config", type=Path)
     args = parser.parse_args(argv)
-    configure_logging(args.log_config)
     if args.command == "download":
-        _download(args)
+        now = datetime.now(AUCKLAND)
+        prepare_run_log(now, args.log_config)
+        _download(args, now)
 
 
-def _download(args: argparse.Namespace) -> None:
+def _download(args: argparse.Namespace, now: datetime) -> None:
     today = args.today or date.today()
-    now = datetime.now(AUCKLAND)
     logger.info("download landing=%s", args.landing)
     download_prices(
         start=args.start,

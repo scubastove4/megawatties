@@ -8,7 +8,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-from log import configure_logging
+from log import prepare_run_log
 from orchestration.poll import run_poll
 from shared.calendar import AUCKLAND
 
@@ -19,12 +19,12 @@ def main(argv: list[str] | None = None) -> None:
     poll = subparsers.add_parser("poll")
     poll.add_argument("--landing", type=Path, default=Path("data/landing"))
     poll.add_argument("--log-config", type=Path)
-    serve = subparsers.add_parser("serve")
-    serve.add_argument("--log-config", type=Path)
+    subparsers.add_parser("serve")
     args = parser.parse_args(argv)
-    configure_logging(args.log_config)
     if args.command == "poll":
-        run_poll(now=datetime.now(AUCKLAND), landing=args.landing)
+        now = datetime.now(AUCKLAND)
+        prepare_run_log(now, args.log_config)
+        run_poll(now=now, landing=args.landing)
         return
     _serve()
 
