@@ -1,5 +1,6 @@
 """Download final-energy files onto the laptop.
 
+    python -m capture download
     python -m capture download --start 2026-11-11 --end 2026-11-17
 """
 
@@ -9,7 +10,7 @@ from pathlib import Path
 
 from capture.download import download_prices, urllib_fetcher
 from log import get_logger, prepare_run_log
-from shared.calendar import AUCKLAND
+from shared.calendar import AUCKLAND, resolve_price_range
 
 logger = get_logger(__name__)
 
@@ -18,8 +19,8 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="capture")
     subparsers = parser.add_subparsers(dest="command", required=True)
     download = subparsers.add_parser("download")
-    download.add_argument("--start", required=True, type=date.fromisoformat)
-    download.add_argument("--end", required=True, type=date.fromisoformat)
+    download.add_argument("--start", type=date.fromisoformat)
+    download.add_argument("--end", type=date.fromisoformat)
     download.add_argument("--today", type=date.fromisoformat)
     download.add_argument("--landing", type=Path, default=Path("data/landing"))
     download.add_argument("--log-config", type=Path)
@@ -31,11 +32,15 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def _download(args: argparse.Namespace, now: datetime) -> None:
-    today = args.today or date.today()
-    logger.info("download landing=%s", args.landing)
+    today = args.today or now.date()
+    try:
+        start, end = resolve_price_range(args.start, args.end, today)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    logger.info("download landing=%s start=%s end=%s", args.landing, start.isoformat(), end.isoformat())
     download_prices(
-        start=args.start,
-        end=args.end,
+        start=start,
+        end=end,
         today=today,
         now=now,
         landing=args.landing,

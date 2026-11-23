@@ -8,9 +8,9 @@ Marks `capture` as the package that downloads final-energy CSVs. It has no funct
 
 ## `__main__.py`
 
-The command line. `python -m capture download --start … --end …` loads `src/log/logging.yaml`, opens a per-run log, calls `download_prices`, and leaves each trading date or month with its own `manifest.json` under `data/landing`.
+The command line. `python -m capture download` loads `src/log/logging.yaml`, opens a per-run log, calls `download_prices`, and leaves each trading date or month with its own `manifest.json` under `data/landing`. With no `--start` or `--end`, the range is the seven calendar days ending on the Auckland date. Passing both dates selects that range. Passing only one of them stops before any download.
 
-`--today` defaults to the laptop's current date and decides whether a date is asked for as a daily file or a `ByMonth` file. `--landing` is `data/landing`. `--log-config` points at a different logging file when you pass one. The clock read for the manifest observation lives here, in Auckland time, and is passed into the download.
+`--today` overrides that Auckland date and decides whether a date is asked for as a daily file or a `ByMonth` file. `--landing` is `data/landing`. `--log-config` points at a different logging file when you pass one. The clock read for the manifest observation lives here, in Auckland time, and is passed into the download.
 
 ## `download.py`
 

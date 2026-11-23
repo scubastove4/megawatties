@@ -154,7 +154,7 @@ Before opening the pull request, follow step 3 in `git-branching.mdc`.
 
 The repo is `~/Desktop/Projects/megawatties`. Phase 1 is in progress on `feature/orchestration-prefect`, cut from `release/phase-1-capture`. Capture, the landing folders, the Free Edition bundle, and the Prefect poll are in place. The poll does not upload or delete.
 
-- `src/capture/` — EMI final-energy download, per-folder manifest, and checksums. Laptop only. Excluded from the bundle. `--start` and `--end` are still required.
+- `src/capture/` — EMI final-energy download, per-folder manifest, and checksums. Laptop only. Excluded from the bundle. With no `--start` or `--end`, the download uses the seven calendar days ending on today's Auckland date. Passing both dates selects that range.
 - `src/shared/` — pure filename, rank, calendar, and checksum rules. Deployed for the later ingestion job. `trading_period_window` is the seven-day poll window.
 - `src/log/` — logging setup and `logging.yaml`. Each capture or poll run writes `logs/capture/YYYYMMDDTHHMMSS.log` and deletes per-run logs strictly older than seven days. Deployed with `shared`.
 - `data/landing/` — gitignored daily and monthly folders, as in the tree above. `daily/2026-11-10/20261110_FinalEnergyPrices.csv` is in the volume, and that manifest has `uploaded` set to true. The other dates stay on the laptop.
@@ -162,7 +162,6 @@ The repo is `~/Desktop/Projects/megawatties`. Phase 1 is in progress on `feature
 - `src/orchestration/` — Prefect poll at 9:30, 15:30, and 18:30 Pacific/Auckland. Calls capture for the seven-day window. Laptop only. Excluded from the bundle. Does not upload or delete.
 - `src/ingestion/` — not started
 - `databricks.yml` — bundle root. Target `dev`, mode `development`, catalog `workspace`, schema `emi`, volume `landing`. Sync excludes `.cursor/`, `docs/`, `src/capture/`, `src/orchestration/`, `README.md`, and `.gitignore`. No jobs yet.
-- Before phase 1 closes: `python -m capture download` with no `--start` or `--end` uses the seven calendar days ending on today's Auckland date. On 20 November that is 14 November through 20 November, weekends included. Passing `--start` and `--end` still downloads that explicit range.
 
 ## Testing
 

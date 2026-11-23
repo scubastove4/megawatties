@@ -18,6 +18,21 @@ def trading_period_window(today: date) -> tuple[date, date]:
     return start, today
 
 
+def resolve_price_range(
+    start: date | None,
+    end: date | None,
+    today: date,
+) -> tuple[date, date]:
+    """Use the seven-day window when no dates are passed. An explicit range needs both ends."""
+    if start is None and end is None:
+        return trading_period_window(today)
+    if start is None or end is None:
+        raise ValueError("start and end are passed together")
+    if end < start:
+        raise ValueError("end is before start")
+    return start, end
+
+
 def _nz_holidays() -> holidays.HolidayBase:
     return holidays.country_holidays("NZ")
 

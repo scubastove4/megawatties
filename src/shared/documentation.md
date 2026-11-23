@@ -22,7 +22,7 @@ NZ business-day deadlines. Pass `now` in. A naive datetime is rejected.
 
 The final for a trading date is due at 15:30 Pacific/Auckland on the next business day. Weekends and New Zealand public holidays are skipped, so a Friday trading date is due at 15:30 on Monday. `final_energy_due` is true once that moment has been reached.
 
-`trading_period_window` is the seven calendar days ending on the date it is given, inclusive. A poll on 20 November asks for 14 November through 20 November.
+`trading_period_window` is the seven calendar days ending on the date it is given, inclusive. A poll on 20 November asks for 14 November through 20 November. `resolve_price_range` uses that window when both dates are omitted, keeps an explicit start and end, and rejects a range with only one end.
 
 Dispatch stays open until 09:30 Pacific/Auckland on trading-date + 3 calendar days. `dispatch_checksum_settled` is true only after that morning, with at least two observations, the last two checksums equal, and the latest observation at or after that morning. A changed checksum on the later poll keeps the file open.
 

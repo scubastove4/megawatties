@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.megawatties.poll</string>
+  <key>WorkingDirectory</key>
+  <string>/<path to projects folder>/megawatties</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/<path to projects folder>/megawatties/.venv/bin/python</string>
+    <string>-m</string>
+    <string>orchestration</string>
+    <string>poll</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict>
+      <key>Hour</key>
+      <integer>15</integer>
+      <key>Minute</key>
+      <integer>30</integer>
+    </dict>
+    <dict>
+      <key>Hour</key>
+      <integer>18</integer>
+      <key>Minute</key>
+      <integer>30</integer>
+    </dict>
+    <dict>
+      <key>Hour</key>
+      <integer>21</integer>
+      <key>Minute</key>
+      <integer>30</integer>
+    </dict>
+  </array>
+  <key>StandardOutPath</key>
+  <string>/<path to projects folder>/megawatties/logs/poll.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/<path to projects folder>/megawatties/logs/poll.err.log</string>
+</dict>
+</plist>
