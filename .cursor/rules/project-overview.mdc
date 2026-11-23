@@ -93,7 +93,7 @@ Reference nodes for published statistics: `BEN2201` (Benmore), `HAY2201` (Haywar
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1 | Capture. Prefect polls. Download interim and final files. Checksum manifest. Local files stay on disk. One smoke upload to the volume. No bronze tables yet. | In progress |
+| 1 | Capture. Prefect polls. Download interim and final files. Checksum manifest. Local files stay on disk. One smoke upload to the volume. No bronze tables yet. | Complete |
 | 2 | Price bronze, versioned silver, `gold.current_price`, change tracking, rolling statistics. Wire the job trigger and local deletion. | Planned |
 | 3 | Dispatch for every node, time-weighted validation, trading-period drill-down. | Planned |
 | 4 | Generation (`Generation_MD`) and one rolling month of offers. Price times estimated injection, not market settlement. | Planned |
@@ -152,7 +152,7 @@ Write the design decision into this file first. Then write the code. The order i
 
 Before opening the pull request, follow step 3 in `git-branching.mdc`.
 
-The repo is `~/Desktop/Projects/megawatties`. Phase 1 is in progress on `feature/orchestration-prefect`, cut from `release/phase-1-capture`. Capture, the landing folders, the Free Edition bundle, and the Prefect poll are in place. The poll does not upload or delete.
+The repo is `~/Desktop/Projects/megawatties`. Phase 1 is complete on `release/phase-1-capture`. Capture, the landing folders, the Free Edition bundle, and the Prefect poll are in place. The poll does not upload or delete. Uploading the other dates, the ingestion job, and local deletion are phase 2. The release branch is ready to merge into `main`.
 
 - `src/capture/` — EMI final-energy download, per-folder manifest, and checksums. Laptop only. Excluded from the bundle. With no `--start` or `--end`, the download uses the seven calendar days ending on today's Auckland date. Passing both dates selects that range.
 - `src/shared/` — pure filename, rank, calendar, and checksum rules. Deployed for the later ingestion job. `trading_period_window` is the seven-day poll window.
