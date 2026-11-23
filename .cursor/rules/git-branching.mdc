@@ -25,8 +25,8 @@ Phases and their order are defined in `project-overview.mdc`. Don't redefine the
 
 1. Cut `release/phase-<n>-<short-name>` from `main` at the start of a phase. `release/phase-1-capture` is cut as part of seeding the repo.
 2. Cut `feature/<short-description>` from that release branch.
-3. When the feature is done, the agent may ask to open a pull request into the release branch. The user merges. Tests must pass first (`pytest`).
-4. Merge the feature into the release branch with a **squash merge** (one squash commit per feature on the release branch). Delete the feature branch afterward and don't reuse it. Start a new branch for follow-up work.
+3. When the feature is done, check `project-overview.mdc`. The design decisions were written there before the code. This step confirms the current codebase and the phase status still match the branch. Tests must pass first (`pytest`). Then open a pull request into the release branch. Stop there. The user reviews the pull request before it is merged.
+4. After the user approves, merge the feature into the release branch with a **squash merge** (one squash commit per feature on the release branch). Delete the feature branch afterward and don't reuse it. Start a new branch for follow-up work.
 5. When the phase is complete, merge the release branch into `main` with a **merge commit** (no squash), so each feature's squash commit stays visible in `main`'s history and remains individually revertable.
 6. Cut the next phase's release branch from `main` only after the previous phase has been merged.
 
@@ -34,7 +34,7 @@ Phases and their order are defined in `project-overview.mdc`. Don't redefine the
 
 - Feature into release: squash merge, one clean commit per feature.
 - Release into main: merge commit, no squash, so features remain traceable and revertable individually.
-- The user performs merges. The agent may ask to open PRs when appropriate. Do not merge unless asked.
+- The user reviews every pull request and performs the merge. Open the pull request, then wait. Do not merge or squash-merge unless the user explicitly says to merge that pull request.
 
 ## Agent rules
 

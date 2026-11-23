@@ -1,0 +1,30 @@
+bundle:
+  name: megawatties
+
+variables:
+  catalog:
+    description: Unity Catalog catalog for this Free Edition workspace.
+    default: workspace
+  schema:
+    description: Schema that holds the EMI landing volume.
+    default: emi
+  landing_volume:
+    description: Volume that stores the staged CSVs.
+    default: landing
+
+sync:
+  exclude:
+    - .cursor/
+    - docs/
+    - src/capture/
+    - src/orchestration/
+    - README.md
+    - .gitignore
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://dbc-ed37dda6-cb93.cloud.databricks.com
+      profile: megawatties

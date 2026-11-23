@@ -1,0 +1,5 @@
+"""Shared logging setup. Import this package from capture, orchestration, and ingestion."""
+
+from log.log import configure_logging, get_logger, prepare_run_log
+
+__all__ = ["configure_logging", "get_logger", "prepare_run_log"]
