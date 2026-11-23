@@ -4,7 +4,7 @@ A download run starts at `python -m capture download`. With no dates, it fetches
 
 A scheduled poll is `python -m orchestration poll`, after `pip install -e ".[orchestration]"`. It downloads the seven calendar days ending on the Auckland date. `python -m orchestration serve` runs that poll at 9:30, 15:30, and 18:30 Pacific/Auckland. The poll does not delete anything.
 
-`src/orchestration/com.megawatties.poll.plist` runs that same poll from macOS without leaving a terminal open. The three paths inside it are this checkout, `.venv/bin/python`, and the `logs/poll.out.log` and `logs/poll.err.log` files. Change those paths if the repo moves. Prior to copying the file to `~/Library/LaunchAgents/com.megawatties.poll.plist`, change <path to projects folder> to where you keep `megawatties`. **NOTE:** Editing the copy in the repo does not change the loaded agent. Copy it again after a change, then load it:
+`src/orchestration/com.megawatties.poll.plist` runs that same poll from macOS without leaving a terminal open. The three paths inside it are this checkout, `.venv/bin/python`, and the `logs/poll.out.log` and `logs/poll.err.log` files. Change those paths if the repo moves. Prior to copying the file to `~/Library/LaunchAgents/com.megawatties.poll.plist`, change `<path to projects folder>` to where you keep `megawatties`. **NOTE:** Editing the copy in the repo does not change the loaded agent. Copy it again after a change, then load it:
 
 ```bash
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.megawatties.poll.plist
