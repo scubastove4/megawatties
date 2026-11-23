@@ -17,6 +17,7 @@ sync:
     - .cursor/
     - docs/
     - src/capture/
+    - src/orchestration/
     - README.md
     - .gitignore
 

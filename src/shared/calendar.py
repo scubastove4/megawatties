@@ -9,6 +9,28 @@ AUCKLAND = ZoneInfo("Pacific/Auckland")
 FINAL_DUE_TIME = time(15, 30)
 DISPATCH_SETTLE_DAYS = 3
 DISPATCH_MORNING = time(9, 30)
+TRADING_PERIOD_LOOKBACK_DAYS = 7
+
+
+def trading_period_window(today: date) -> tuple[date, date]:
+    """Seven calendar days ending on today, inclusive."""
+    start = today - timedelta(days=TRADING_PERIOD_LOOKBACK_DAYS - 1)
+    return start, today
+
+
+def resolve_price_range(
+    start: date | None,
+    end: date | None,
+    today: date,
+) -> tuple[date, date]:
+    """Use the seven-day window when no dates are passed. An explicit range needs both ends."""
+    if start is None and end is None:
+        return trading_period_window(today)
+    if start is None or end is None:
+        raise ValueError("start and end are passed together")
+    if end < start:
+        raise ValueError("end is before start")
+    return start, end
 
 
 def _nz_holidays() -> holidays.HolidayBase:

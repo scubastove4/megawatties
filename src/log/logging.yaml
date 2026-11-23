@@ -1,3 +1,4 @@
+# Each run replaces the file handler path with logs/capture/YYYYMMDDTHHMMSS.log.
 version: 1
 disable_existing_loggers: false
 formatters:
@@ -11,7 +12,7 @@ handlers:
   file:
     class: logging.FileHandler
     formatter: plain
-    filename: logs/capture.log
+    filename: logs/capture/run.log
     mode: a
 root:
   level: INFO
