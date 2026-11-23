@@ -114,7 +114,7 @@ Branch names for these phases live in `git-branching.mdc`. Do not redefine the p
 
 - **Polls:** 9:30, 15:30, and 18:30 in `Pacific/Auckland`. The 15:30 run is the one after the 2pm final-price deadline. The first runs record whether the morning file is already present at 9:30, and whether the interim checksum changes across the three runs.
 - **Lookback:** seven calendar days for trading-period files, ending on the Auckland date, inclusive. Five calendar days for dispatch files.
-- **Final-price deadline:** 2pm NZ on the next business day. Weekends and NZ public holidays are skipped. A Friday trading date is due Monday at 15:30. A pricing-error claim can push it later.
+- **Final-price deadline:** 2pm NZ on the next business day. Weekends and NZ public holidays are skipped. A Friday trading date is due Monday at 15:30. A pricing-error claim can push it later, which is why a poll at 18:30 is scheduled.
 - **Dispatch settlement:** treat the file as open until the morning after trading-date + 3 calendar days. Delete the local CSV only when the final trading-period file is in `emi.ingested_files`, the dispatch file is ingested, today is at least trading-date + 3 calendar days, and a later poll saw the same checksum.
 - **Ranks:** final 3, incomplete 2, interim 1.
 - **Change and rolling windows:** 7, 14, 30, 90, 180, 270, and 365 days. Rolling statistics also include 12 hours and 24 hours.
