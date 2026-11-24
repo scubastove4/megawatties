@@ -9,7 +9,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from capture.download import download_prices, urllib_fetcher
-from log import get_logger, prepare_run_log
+from log import get_logger, prepare_run_log, record_failure
 from shared.calendar import AUCKLAND, resolve_price_range
 
 logger = get_logger(__name__)
@@ -27,25 +27,27 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     if args.command == "download":
         now = datetime.now(AUCKLAND)
-        prepare_run_log(now, args.log_config)
         _download(args, now)
 
 
 def _download(args: argparse.Namespace, now: datetime) -> None:
+    prepare_run_log(now, args.log_config)
     today = args.today or now.date()
     try:
         start, end = resolve_price_range(args.start, args.end, today)
     except ValueError as exc:
+        logger.error("download rejected reason=%s", exc)
         raise SystemExit(str(exc)) from exc
     logger.info("download landing=%s start=%s end=%s", args.landing, start.isoformat(), end.isoformat())
-    download_prices(
-        start=start,
-        end=end,
-        today=today,
-        now=now,
-        landing=args.landing,
-        fetcher=urllib_fetcher,
-    )
+    with record_failure(logger, "download failed"):
+        download_prices(
+            start=start,
+            end=end,
+            today=today,
+            now=now,
+            landing=args.landing,
+            fetcher=urllib_fetcher,
+        )
 
 
 if __name__ == "__main__":

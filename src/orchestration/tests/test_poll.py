@@ -1,8 +1,10 @@
 from datetime import datetime
 from pathlib import Path
+from urllib.error import URLError
 
 import pytest
 
+from orchestration.__main__ import main
 from orchestration.poll import POLL_CRON, POLL_TIMEZONE, run_poll
 from shared.calendar import AUCKLAND
 
@@ -33,3 +35,22 @@ def test_poll_asks_for_seven_calendar_days_ending_today(tmp_path: Path) -> None:
 def test_poll_rejects_a_naive_clock() -> None:
     with pytest.raises(ValueError, match="timezone-aware"):
         run_poll(now=datetime(2026, 11, 20, 9, 30), landing=Path("data/landing"))
+
+
+def test_poll_failure_is_written_to_the_run_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "orchestration.__main__.datetime",
+        type("Clock", (), {"now": staticmethod(lambda tz=None: datetime(2026, 11, 20, 9, 30, tzinfo=AUCKLAND))}),
+    )
+
+    def fail(**kwargs: object) -> None:
+        raise URLError("handshake timed out")
+
+    monkeypatch.setattr("orchestration.__main__.run_poll", fail)
+    with pytest.raises(SystemExit) as exc:
+        main(["poll"])
+    assert exc.value.code == 1
+    text = (tmp_path / "logs/capture/20261120T093000.log").read_text(encoding="utf-8")
+    assert "ERROR orchestration.poll poll failed" in text
+    assert "urlopen error handshake timed out" in text

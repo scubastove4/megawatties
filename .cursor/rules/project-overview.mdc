@@ -94,7 +94,7 @@ Reference nodes for published statistics: `BEN2201` (Benmore), `HAY2201` (Haywar
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Capture. Prefect polls. Download interim and final files. Checksum manifest. Local files stay on disk. One smoke upload to the volume. No bronze tables yet. | Complete |
-| 2 | Price bronze, versioned silver, `gold.current_price`, change tracking, rolling statistics. Wire the job trigger and local deletion. | Planned |
+| 2 | Price bronze, versioned silver, `gold.current_price`, change tracking, rolling statistics. Wire the job trigger and local deletion. | In progress |
 | 3 | Dispatch for every node, time-weighted validation, trading-period drill-down. | Planned |
 | 4 | Generation (`Generation_MD`) and one rolling month of offers. Price times estimated injection, not market settlement. | Planned |
 | 5 | Open-Meteo weather beside hydro and wind generation and the island reference prices. | Planned |
@@ -152,11 +152,11 @@ Write the design decision into this file first. Then write the code. The order i
 
 Before opening the pull request, follow step 3 in `git-branching.mdc`.
 
-The repo is `~/Desktop/Projects/megawatties`. Phase 1 is complete on `release/phase-1-capture`. Capture, the landing folders, the Free Edition bundle, and the Prefect poll are in place. The poll does not upload or delete. Uploading the other dates, the ingestion job, and local deletion are phase 2. The release branch is ready to merge into `main`.
+The repo is `~/Desktop/Projects/megawatties`. Phase 1 is complete on `main`. Phase 2 is in progress on `feature/initial-bronze`, cut from `release/phase-2-prices`. The first slice is bronze for the file already in the volume, `daily/2026-11-10/20261110_FinalEnergyPrices.csv`. Parse that daily file in `src/shared/`, skip a checksum bronze has already stored, and have `src/ingestion/` append the file to one bronze table. Silver, `gold.current_price`, change tracking, rolling statistics, uploading the other dates, the job trigger, and local deletion come after this slice. The poll does not upload or delete.
 
-- `src/capture/` — EMI final-energy download, per-folder manifest, and checksums. Laptop only. Excluded from the bundle. With no `--start` or `--end`, the download uses the seven calendar days ending on today's Auckland date. Passing both dates selects that range.
+- `src/capture/` — EMI final-energy download, per-folder manifest, and checksums. Laptop only. Excluded from the bundle. With no `--start` or `--end`, the download uses the seven calendar days ending on today's Auckland date. Passing both dates selects that range. Passing only one is rejected: the log names the missing date and says that omitting both is valid.
 - `src/shared/` — pure filename, rank, calendar, and checksum rules. Deployed for the later ingestion job. `trading_period_window` is the seven-day poll window.
-- `src/log/` — logging setup and `logging.yaml`. Each capture or poll run writes `logs/capture/YYYYMMDDTHHMMSS.log` and deletes per-run logs strictly older than seven days. Deployed with `shared`.
+- `src/log/` — logging setup and `logging.yaml`. Each capture or poll run writes `logs/capture/YYYYMMDDTHHMMSS.log` when the command starts, and deletes per-run logs strictly older than seven days. That file is the record of the run. A rejected download writes the reason into it and stops before any download. An unexpected failure, including a connection error, writes the error and its traceback into that same file. Pytest does not write these run logs into the repo. Deployed with `shared`.
 - `data/landing/` — gitignored daily and monthly folders, as in the tree above. `daily/2026-11-10/20261110_FinalEnergyPrices.csv` is in the volume, and that manifest has `uploaded` set to true. The other dates stay on the laptop.
 - `docs/databricks-setup.md` — Free Edition setup, the one-file volume copy, and the `dev` bundle.
 - `src/orchestration/` — Prefect poll at 9:30, 15:30, and 18:30 Pacific/Auckland. Calls capture for the seven-day window. Laptop only. Excluded from the bundle. Does not upload or delete.
@@ -168,7 +168,7 @@ The repo is `~/Desktop/Projects/megawatties`. Phase 1 is complete on `release/ph
 - Tests are required for domain rules and transforms, written with the code. A feature is not done until its tests pass. Fix the code, not the test, unless the user approves a requirement change.
 - Keep filename selection, rank, business-day deadlines, UTC intervals, checksum decisions, the current-price winner, change-tracking pair selection, and the time-weighted average in `src/shared/` as pure functions.
 - Runner: pytest from the repo root.
-- Co-locate tests inside the package they cover. Use checked-in fixtures and fixed timestamps. No live EMI calls, no Databricks workspace, and no real clock in unit tests.
+- Co-locate tests inside the package they cover. Use checked-in fixtures and fixed timestamps. No live EMI calls, no Databricks workspace, and no real clock in unit tests. Pytest writes log files only under a temporary directory, so `logs/capture/` stays limited to capture and poll runs.
 
 ## Dev environment
 

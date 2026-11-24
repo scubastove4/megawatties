@@ -1,5 +1,7 @@
 """Load logging.yaml and hand loggers to capture, orchestration, and ingestion."""
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from logging.config import dictConfig
 from pathlib import Path
@@ -74,6 +76,16 @@ def configure_logging(path: Path | None = None, *, now: datetime | None = None) 
         if isinstance(filename, str) and filename:
             Path(filename).parent.mkdir(parents=True, exist_ok=True)
     dictConfig(payload)
+
+
+@contextmanager
+def record_failure(logger: logging.Logger, message: str) -> Iterator[None]:
+    """Write an unexpected failure and its traceback to the run log, then exit."""
+    try:
+        yield
+    except Exception:
+        logger.exception(message)
+        raise SystemExit(1) from None
 
 
 def _require_now(now: datetime | None) -> datetime:

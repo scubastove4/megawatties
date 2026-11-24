@@ -32,9 +32,20 @@ def test_explicit_dates_keep_that_range() -> None:
     )
 
 
-def test_one_end_of_the_range_is_rejected() -> None:
-    with pytest.raises(ValueError, match="passed together"):
+def test_only_start_says_end_is_required_and_neither_is_valid() -> None:
+    with pytest.raises(
+        ValueError,
+        match="end is required when start is provided. Optionally, omit both to use the current seven-day window.",
+    ):
         resolve_price_range(date(2026, 11, 1), None, date(2026, 11, 20))
+
+
+def test_only_end_says_start_is_required_and_neither_is_valid() -> None:
+    with pytest.raises(
+        ValueError,
+        match="start is required when end is provided. Optionally, omit both to use the current seven-day window.",
+    ):
+        resolve_price_range(None, date(2026, 11, 3), date(2026, 11, 20))
 
 
 def test_friday_final_is_due_monday_at_1530() -> None:

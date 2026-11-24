@@ -20,8 +20,8 @@ The Prefect flow `poll-prices`. It reads the Auckland clock, then calls `run_pol
 
 ## `__main__.py`
 
-`python -m orchestration poll` runs one poll now. It deletes per-run logs strictly older than seven days, then writes `logs/capture/YYYYMMDDTHHMMSS.log` for this run. `python -m orchestration serve` starts the schedule, and each scheduled run does that same log cleanup before the download. `--landing` changes the folder for one poll. `--log-config` points at a different logging file for one poll.
+`python -m orchestration poll` runs one poll now. It deletes per-run logs strictly older than seven days, then writes `logs/capture/YYYYMMDDTHHMMSS.log` for this run. A connection error or any other unexpected failure writes `poll failed` and the traceback into that file, then exits. `python -m orchestration serve` starts the schedule, and each scheduled run does that same log cleanup before the download and records a failure in the same way. `--landing` changes the folder for one poll. `--log-config` points at a different logging file for one poll.
 
 ## `tests/test_poll.py`
 
-The cron is the three Auckland times. A poll at 09:30 on 20 November 2026 asks for 14 November through 20 November and does not ask for 13 November. Nothing is written when every response is empty. A naive clock is rejected.
+The cron is the three Auckland times. A poll at 09:30 on 20 November 2026 asks for 14 November through 20 November and does not ask for 13 November. Nothing is written when every response is empty. A naive clock is rejected. A failed poll writes `poll failed` and the traceback into that run's capture log, then exits.

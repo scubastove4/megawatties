@@ -1,10 +1,11 @@
 from datetime import datetime
 from pathlib import Path
+from urllib.error import URLError
 import logging
 
 import pytest
 
-from log import configure_logging, prepare_run_log
+from log import configure_logging, get_logger, prepare_run_log, record_failure
 from log.log import DEFAULT_CONFIG, cleanup_run_logs, run_log_path
 from shared.calendar import AUCKLAND
 
@@ -57,6 +58,18 @@ def test_prepare_run_log_deletes_files_older_than_seven_days(tmp_path: Path, mon
     assert other.exists() is True
     prepare_run_log(NOW)
     assert (directory / "20261121T093000.log").is_file()
+
+
+def test_record_failure_writes_the_traceback_to_the_run_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    configure_logging(now=NOW)
+    with pytest.raises(SystemExit) as exc:
+        with record_failure(get_logger("capture.download"), "download failed"):
+            raise URLError("handshake timed out")
+    assert exc.value.code == 1
+    text = (tmp_path / "logs/capture/20261121T093000.log").read_text(encoding="utf-8")
+    assert "ERROR capture.download download failed" in text
+    assert "urlopen error handshake timed out" in text
 
 
 def test_run_log_path_rejects_a_naive_clock() -> None:

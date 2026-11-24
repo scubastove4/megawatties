@@ -26,8 +26,14 @@ def resolve_price_range(
     """Use the seven-day window when no dates are passed. An explicit range needs both ends."""
     if start is None and end is None:
         return trading_period_window(today)
-    if start is None or end is None:
-        raise ValueError("start and end are passed together")
+    if start is None:
+        raise ValueError(
+            "start is required when end is provided. Optionally, omit both to use the current seven-day window."
+        )
+    if end is None:
+        raise ValueError(
+            "end is required when start is provided. Optionally, omit both to use the current seven-day window."
+        )
     if end < start:
         raise ValueError("end is before start")
     return start, end

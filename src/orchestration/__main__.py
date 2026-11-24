@@ -8,9 +8,11 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-from log import prepare_run_log
+from log import get_logger, prepare_run_log, record_failure
 from orchestration.poll import run_poll
 from shared.calendar import AUCKLAND
+
+logger = get_logger("orchestration.poll")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -24,7 +26,8 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "poll":
         now = datetime.now(AUCKLAND)
         prepare_run_log(now, args.log_config)
-        run_poll(now=now, landing=args.landing)
+        with record_failure(logger, "poll failed"):
+            run_poll(now=now, landing=args.landing)
         return
     _serve()
 

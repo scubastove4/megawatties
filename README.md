@@ -1,6 +1,6 @@
 # Megawatties
 
-A download run starts at `python -m capture download`. With no dates, it fetches the seven calendar days ending on the Auckland date. `--start` and `--end` select a different range, and they are passed together. The command loads `src/log/logging.yaml`, writes `logs/capture/YYYYMMDDTHHMMSS.log` for that run, fetches the files, and writes one `manifest.json` in each trading-date or month folder under `data/landing`. It does not delete downloaded CSVs. A run deletes per-run logs strictly older than seven days.
+A download run starts at `python -m capture download`. With no dates, it fetches the seven calendar days ending on the Auckland date. `--start` and `--end` select a different range when both are set. Passing only one of them is rejected. Omitting both is valid and uses the seven-day window. The command loads `src/log/logging.yaml`, writes `logs/capture/YYYYMMDDTHHMMSS.log` for that run, fetches the files, and writes one `manifest.json` in each trading-date or month folder under `data/landing`. It does not delete downloaded CSVs. A run deletes per-run logs strictly older than seven days.
 
 A scheduled poll is `python -m orchestration poll`, after `pip install -e ".[orchestration]"`. It downloads the seven calendar days ending on the Auckland date. `python -m orchestration serve` runs that poll at 9:30, 15:30, and 18:30 Pacific/Auckland. The poll does not delete anything.
 
