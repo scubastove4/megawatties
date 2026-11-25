@@ -14,6 +14,9 @@ from shared.calendar import AUCKLAND
 
 logger = get_logger("orchestration.poll")
 
+POLL_CRON = "30 9,15,18 * * *"
+POLL_TIMEZONE = "Pacific/Auckland"
+
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="orchestration")
@@ -32,14 +35,14 @@ def main(argv: list[str] | None = None) -> None:
     _serve()
 
 
-def _serve() -> None:
+def _serve(cron: str = POLL_CRON, timezone: str = POLL_TIMEZONE) -> None:
     try:
         from orchestration.flow import serve_poll
     except ModuleNotFoundError as exc:
         if exc.name != "prefect":
             raise
         raise SystemExit("Install the orchestration extra: pip install -e '.[orchestration]'") from exc
-    serve_poll()
+    serve_poll(cron=cron, timezone=timezone)
 
 
 if __name__ == "__main__":

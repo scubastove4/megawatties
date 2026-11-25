@@ -9,9 +9,6 @@ from shared.calendar import AUCKLAND, trading_period_window
 
 logger = get_logger(__name__)
 
-POLL_CRON = "30 9,15,18 * * *"
-POLL_TIMEZONE = "Pacific/Auckland"
-
 
 def run_poll(
     *,

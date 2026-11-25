@@ -4,8 +4,8 @@ from urllib.error import URLError
 
 import pytest
 
-from orchestration.__main__ import main
-from orchestration.poll import POLL_CRON, POLL_TIMEZONE, run_poll
+from orchestration.__main__ import POLL_CRON, POLL_TIMEZONE, main
+from orchestration.poll import run_poll
 from shared.calendar import AUCKLAND
 
 
