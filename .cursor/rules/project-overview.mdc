@@ -60,7 +60,7 @@ Unity Catalog catalog: `workspace`. Schema: `emi`. Volume: `workspace.emi.landin
 
 ## Data design
 
-**Trading-period prices** (`FinalEnergyPrices`), one bronze table for interim, final, and incomplete files. Append-only. Raw columns plus source filename, file status, file modified time when known, ingest timestamp, and checksum. Skip a file whose checksum is unchanged.
+**Trading-period prices** (`FinalEnergyPrices`) land in `workspace.emi.bronze_energy_price`, one append-only table for interim, final, and incomplete files. Raw columns plus source filename, file status, file modified time when known, ingest timestamp, and checksum. `workspace.emi.ingested_files` records each loaded checksum. Skip a file whose checksum is already there. The 10 November 2026 final is loaded, and a second run of that insert added no rows. Steps for that load are in `docs/bronze-energy-prices.md`.
 
 **Silver prices** keep every version, including an interim that arrives after a final. Grain: `(point_of_connection, trading_date, trading_period, source_file, checksum)`. Each row has `status_rank`, `ingested_at`, and the UTC interval start and end.
 
@@ -152,15 +152,15 @@ Write the design decision into this file first. Then write the code. The order i
 
 Before opening the pull request, follow step 3 in `git-branching.mdc`.
 
-The repo is `~/Desktop/Projects/megawatties`. Phase 1 is complete on `main`. Phase 2 is in progress on `feature/initial-bronze`, cut from `release/phase-2-prices`. The first slice is bronze for the file already in the volume, `daily/2026-11-10/20261110_FinalEnergyPrices.csv`. Parse that daily file in `src/shared/`, skip a checksum bronze has already stored, and have `src/ingestion/` append the file to one bronze table. Silver, `gold.current_price`, change tracking, rolling statistics, uploading the other dates, the job trigger, and local deletion come after this slice. The poll does not upload or delete.
+The repo is `~/Desktop/Projects/megawatties`. Phase 1 is complete on `main`. Phase 2 is in progress on `feature/initial-bronze`, cut from `release/phase-2-prices`. The 10 November 2026 final is in `workspace.emi.bronze_energy_price`, and its checksum is in `workspace.emi.ingested_files`. The next slice is the laptop upload. `capture` copies landing files to the volume and marks the manifest `uploaded`. A file already uploaded with the same checksum is left in place. The copy is passed in, the same way the download fetcher is, and `capture` does not import the Databricks SDK. Orchestration calls that function after the poll. The volume-to-bronze Python job comes after that. Silver, `gold.current_price`, change tracking, rolling statistics, the job trigger, and local deletion come after the bronze job. The poll does not delete.
 
-- `src/capture/` — EMI final-energy download, per-folder manifest, and checksums. Laptop only. Excluded from the bundle. With no `--start` or `--end`, the download uses the seven calendar days ending on today's Auckland date. Passing both dates selects that range. Passing only one is rejected: the log names the missing date and says that omitting both is valid.
+- `src/capture/` — EMI final-energy download, per-folder manifest, checksums, and the landing-to-volume copy. Laptop only. Excluded from the bundle. No Databricks SDK. With no `--start` or `--end`, the download uses the seven calendar days ending on today's Auckland date. Passing both dates selects that range. Passing only one is rejected: the log names the missing date and says that omitting both is valid.
 - `src/shared/` — pure filename, rank, calendar, and checksum rules. Deployed for the later ingestion job. `trading_period_window` is the seven-day poll window.
 - `src/log/` — logging setup and `logging.yaml`. Each capture or poll run writes `logs/capture/YYYYMMDDTHHMMSS.log` when the command starts, and deletes per-run logs strictly older than seven days. That file is the record of the run. A rejected download writes the reason into it and stops before any download. An unexpected failure, including a connection error, writes the error and its traceback into that same file. Pytest does not write these run logs into the repo. Deployed with `shared`.
 - `data/landing/` — gitignored daily and monthly folders, as in the tree above. `daily/2026-11-10/20261110_FinalEnergyPrices.csv` is in the volume, and that manifest has `uploaded` set to true. The other dates stay on the laptop.
 - `docs/databricks-setup.md` — Free Edition setup, the one-file volume copy, and the `dev` bundle.
-- `src/orchestration/` — Prefect poll at 9:30, 15:30, and 18:30 Pacific/Auckland. Calls capture for the seven-day window. Laptop only. Excluded from the bundle. Does not upload or delete.
-- `src/ingestion/` — not started
+- `src/orchestration/` — Prefect poll at 9:30, 15:30, and 18:30 Pacific/Auckland. Calls capture for the seven-day window, then for the volume copy. Laptop only. Excluded from the bundle. Does not delete. `POLL_CRON` and `POLL_TIMEZONE` belong to the serve command in `__main__.py` and are passed into `serve_poll`. `poll.py` does not use them.
+- `src/ingestion/` — not started. The one-file SQL load in `docs/bronze-energy-prices.md` is done. The Python job that reads the volume and appends bronze comes after the laptop upload.
 - `databricks.yml` — bundle root. Target `dev`, mode `development`, catalog `workspace`, schema `emi`, volume `landing`. Sync excludes `.cursor/`, `docs/`, `src/capture/`, `src/orchestration/`, `README.md`, and `.gitignore`. No jobs yet.
 
 ## Testing
