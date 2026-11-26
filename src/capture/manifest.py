@@ -1,8 +1,9 @@
 """Local record of captured files. An unchanged checksum is not written again."""
 
+import json
+
 from dataclasses import dataclass, field
 from datetime import datetime
-import json
 from pathlib import Path
 
 from log import get_logger

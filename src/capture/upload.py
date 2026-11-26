@@ -8,8 +8,8 @@ from log import get_logger, prepare_run_log
 from dataclasses import dataclass, field
 from capture.manifest import Manifest
 from shared.filenames import _dates
-from shared.checksums import sha256_hex
 from manifest import _disk_matches
+from volume import copy_file_to_volume, validate_volume_file
 
 
 logger = get_logger(__name__)
@@ -116,11 +116,10 @@ def upload_file(*, manifest: Manifest, report: UploadReport, landing_path: Path)
             report.missing_file.append(relative_path) # may want to add a check to see if local_exists status is accurate
         else:  # at this point if there's at least one observation, assume it's downloaded and available to be uploaded
             # if the local copy exists/file is downloaded
-            volume_validated = validate_volume_file(relative_path, manifest_hash)
                 # check if the object exists in the volume
                     # if it does, hash the object and compare to the manifest
                         # if they match, change manifest status to uploaded, but add filename to 'skipped' -> status['skipped'].append(filename)
-            if volume_validated:
+            if validate_volume_file(relative_path, manifest_hash):
                 report.skipped.append(relative_path)
                 item.uploaded = True
                 continue
@@ -148,125 +147,8 @@ def upload_file(*, manifest: Manifest, report: UploadReport, landing_path: Path)
     return manifest, report
 
 
-def validate_volume_file(file_path: str, manifest_hash: str) -> bool:
-    # check if the object exists in the volume
-        # if it does, hash the object and compare to the manifest
-    args = [
-        '/opt/homebrew/bin/databricks', 'fs', 'cat',
-        f'dbfs:/Volumes/workspace/emi/landing/{file_path}',
-        '--profile', 'megawatties',
-    ]
-    # args = [
-    #             'databricks', 'fs', 'cat',
-    #             f'dbfs:/Volumes/workspace/emi/landing/daily/2026-11-22/20261122_FinalEnergyPrices.csv',
-    #             '--profile', 'megawatties',
-    #         ]
-    try:
-        completed = subprocess.run(
-            args=args,
-            capture_output=True,
-            check=True,
-            timeout=60,
-        )
-        logger.info(f'File: {file_path} exists on the Volume.')
-        volume_hash = sha256_hex(completed.stdout)
-        logger.info(f'{volume_hash = }')
-    except subprocess.CalledProcessError as e:
-        logger.warning(f'Command: `{" ".join(args)}` failed with exit code {e.returncode}: {e.stderr}')
-        return False
-    except subprocess.TimeoutExpired:
-        logger.warning(f'The command: `{" ".join(args)}` timed out.')
-        return False
-    except FileNotFoundError:
-        logger.warning(
-            f'Unable to call the Databricks CLI. Add the absolute path to args. Command executed: `{" ".join(args)}`')
-        return False
-
-    file_in_volume = True if volume_hash else False
-    logger.info(f'{file_in_volume = }')
-    hash_matches = True if manifest_hash == volume_hash else False
-    logger.info(f'{hash_matches = }')
-    return file_in_volume and hash_matches
-
-
 def validate_local_file(file_path: Path, manifest_hash: str) -> bool:
     return _disk_matches(file_path, manifest_hash)
-
-
-def copy_file_to_volume(local_file_path: Path, relative_file_path) -> bool:
-    validate_or_make_dir(local_file_path)
-
-    args = [
-        '/opt/homebrew/bin/databricks', 'fs', 'cat',
-        f'dbfs:/Volumes/workspace/emi/landing/{relative_file_path}',
-        '--profile', 'megawatties',
-    ]
-    # args = [
-    #             'databricks', 'fs', 'cat',
-    #             f'dbfs:/Volumes/workspace/emi/landing/daily/2026-11-22/20261122_FinalEnergyPrices.csv',
-    #             '--profile', 'megawatties',
-    #         ]
-    try:
-        completed = subprocess.run(
-            args=args,
-            capture_output=True,
-            check=True,
-            timeout=60,
-        )
-        logger.info(f'File: {relative_file_path} written to the Volume.')
-        volume_hash = sha256_hex(completed.stdout)
-        logger.info(f'{volume_hash = }')
-    except subprocess.CalledProcessError as e:
-        logger.warning(f'Command: `{" ".join(args)}` failed with exit code {e.returncode}: {e.stderr}')
-        return False
-    except subprocess.TimeoutExpired:
-        logger.warning(f'The command: `{" ".join(args)}` timed out.')
-        return False
-
-
-def validate_or_make_dir(local_file_path: Path) -> None:
-    kind_and_date_folders = '/'.join(local_file_path.parts[-3:-1])
-    dated_folder_volume_path = f'dbfs:/Volumes/workspace/emi/landing/{kind_and_date_folders}'
-
-    args = [
-        '/opt/homebrew/bin/databricks', 'fs', 'ls',
-        dated_folder_volume_path,
-        '--profile', 'megawatties',
-    ]
-
-    try:
-        subprocess.run(
-            args=args,
-            capture_output=True,
-            check=True,
-            timeout=60,
-        )
-        logger.info(f'Dated folder already exists on the Volume: {dated_folder_volume_path}.')
-    except subprocess.CalledProcessError as e:
-        logger.warning(f'Command: `{" ".join(args)}` failed with exit code {e.returncode}: {e.stderr}')
-
-        args = [
-            '/opt/homebrew/bin/databricks', 'fs', 'mkdirs',
-            dated_folder_volume_path,
-            '--profile', 'megawatties',
-        ]
-
-        try:
-            subprocess.run(
-                args=args,
-                capture_output=True,
-                check=True,
-                timeout=60,
-            )
-            logger.info(f'date folder exists on the Volume: {dated_folder_volume_path}.')
-        except subprocess.CalledProcessError as e:
-            logger.warning(f'Command: `{" ".join(args)}` failed with exit code {e.returncode}: {e.stderr}')
-            return
-    except subprocess.TimeoutExpired:
-        logger.warning(f'The command: `{" ".join(args)}` timed out.')
-        return
-
-    return
 
 
 if __name__ == '__main__':
