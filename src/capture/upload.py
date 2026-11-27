@@ -3,11 +3,10 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 
-from capture.manifest import Manifest
+from capture.manifest import _disk_matches, Manifest
+from capture.volume import copy_file_to_volume, validate_volume_file, VolumeRecord
 from log import get_logger
-from manifest import _disk_matches
 from shared.filenames import _dates
-from volume import copy_file_to_volume, validate_volume_file, VolumeRecord
 
 
 logger = get_logger(__name__)
@@ -68,7 +67,7 @@ def upload_prices(
                               else str(landing / kind) + '/{date[:6]}/manifest.json')
 
     for dt in _dates(start, end):
-        logger.info(f'Copying local file to Volume for trading date: {dt}.')
+        logger.info(f'Copying local file(s) to Volume for trading date: {dt}.')
         manifest_path = Path(manifest_path_template.format(date=dt))
         if not manifest_path.exists():
             report.missing_manifest.append(str(manifest_path))
@@ -123,6 +122,8 @@ def upload_file(*, manifest: Manifest, report: UploadReport, landing_path: Path,
         volume_record = VolumeRecord(relative_path=relative_path, trading_date=dt,
                                      local_file_path=str(local_file_path))
         volume_record.set_paths(kind)
+
+        logger.info(f'Copying a `{item.status}` file.')
 
         if not item.observations or not item.local_exists:
             report.missing_file.append(relative_path) # may want to add a check to see if local_exists status is accurate
@@ -179,17 +180,17 @@ def validate_local_file(file_path: Path, manifest_hash: str) -> bool:
     return _disk_matches(file_path, manifest_hash)
 
 
-if __name__ == '__main__':
-    from shared.calendar import AUCKLAND
-    from log import prepare_run_log
-
-    s = date(2026, 11, 10)
-    e = date(2026, 11, 13)
-    t = date.today()
-    n = datetime.now(AUCKLAND)
-    l = Path('data/landing')
-    k = 'daily'
-
-    prepare_run_log(n)
-
-    upload_prices(start=s, end=e, today=t, now=n, landing=l, kind=k)
+# if __name__ == '__main__':
+#     from shared.calendar import AUCKLAND
+#     from log import prepare_run_log
+#
+#     s = date(2026, 11, 10)
+#     e = date(2026, 11, 13)
+#     t = date.today()
+#     n = datetime.now(AUCKLAND)
+#     l = Path('data/landing')
+#     k = 'daily'
+#
+#     prepare_run_log(n)
+#
+#     upload_prices(start=s, end=e, today=t, now=n, landing=l, kind=k)
